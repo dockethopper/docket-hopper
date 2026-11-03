@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -26,12 +27,17 @@ def bill_text(raw: str) -> str:
     return strip_html(" ".join(bodies) if bodies else raw) or ""
 
 
-def run(conn, limit: int | None = None, workers: int = 8, keep_text_dir: Path | None = None) -> int:
-    q = "SELECT bill_id, latest_text_url, status FROM bills WHERE word_count IS NULL AND latest_text_url IS NOT NULL ORDER BY introduced_date DESC"
+def run(conn, limit: int | None = None, workers: int = 8, keep_text_dir: Path | None = None, minutes: float | None = None) -> int:
+    # Newest Congress first, then older ones over later nights (decision D3).
+    q = ("SELECT bill_id, latest_text_url, status FROM bills WHERE word_count IS NULL AND latest_text_url IS NOT NULL "
+         "ORDER BY congress DESC, introduced_date DESC")
+    deadline = time.monotonic() + minutes * 60 if minutes else None
     rows = conn.execute(q + (f" LIMIT {int(limit)}" if limit else "")).fetchall()
     log.info("textstats: %d bills need a word count", len(rows))
 
     def work(row):
+        if deadline and time.monotonic() > deadline:
+            return row, None, TimeoutError("time budget spent")
         try:
             text = bill_text(_get(row["latest_text_url"]).decode("utf-8", "replace"))
             return row, text, None
@@ -41,6 +47,8 @@ def run(conn, limit: int | None = None, workers: int = 8, keep_text_dir: Path | 
     n = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for row, text, err in pool.map(work, rows):
+            if isinstance(err, TimeoutError):
+                continue
             if err:
                 log.warning("text fetch failed %s: %s", row["bill_id"], err)
                 continue

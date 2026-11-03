@@ -1,0 +1,55 @@
+---
+// Slide anatomy on every page (G3): tracker band, slim nav row, page body, then notes,
+// numbered sources and the page number in the footer.
+import "../styles/global.css";
+import site from "../data/site.json";
+import { SECTIONS, SOURCES, fmt, fdate } from "../lib/ui.js";
+
+interface Props { title: string; description?: string; section: keyof typeof SECTIONS | string; nav?: string; note?: string; page: number; sectionText?: string; canonical?: string; }
+const { title, description, section, nav, note, page, sectionText, canonical } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const sec = sectionText || SECTIONS[section] || "";
+const items = [["bills", "Bills", `${base}bills/${site.cur}/`], ["map", "Map", `${base}map/`], ["coverage", "Coverage", `${base}coverage/`], ["outcomes", "Outcomes", `${base}outcomes/`], ["about", "About the data", `${base}about/`]];
+const desc = description || `Every bill in Congress since 2013, read from the public record. Updated nightly.`;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  <meta name="description" content={desc}>
+  {canonical && <link rel="canonical" href={canonical}>}
+  <meta property="og:title" content={title}>
+  <meta property="og:description" content={desc}>
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+  <script is:inline define:vars={{ base }}>window.DH_BASE = base;</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header>
+    <div class="wrap site-track"><a class="mark" href={base}><i></i>Docket Hopper</a><span id="dh-section">{sec}</span></div>
+    <div class="site-nav-row"><div class="wrap site-nav">
+      <nav aria-label="Main">{items.map(([k, l, h]) => <a href={h} class={nav === k ? "on" : ""} aria-current={nav === k ? "page" : undefined}>{l}</a>)}</nav>
+      <form action={`${base}search/`} method="get" role="search"><input class="search" type="search" name="q" id="dh-q" placeholder={`Search ${fmt(site.totals.bills)} bills by title, number or sponsor`} aria-label="Search bills"></form>
+    </div></div>
+  </header>
+  <main id="main" class="wrap page"><slot /></main>
+  <footer class="site-foot"><div class="wrap"><span id="dh-note">{note ? `Note: ${note} ` : ""}{SOURCES} Updated nightly; data through {fdate(site.data_date)}.</span><span class="pg" id="dh-pg">{String(page).padStart(2, "0")}</span></div></footer>
+  <div class="tip" id="tip" hidden></div>
+  <script>
+    // "/" jumps to search, like the mock-up's keyboard hint.
+    addEventListener("keydown", (e) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const el = (document.getElementById("dh-big") || document.getElementById("dh-q")) as HTMLInputElement | null;
+      if (el) { e.preventDefault(); el.focus(); }
+    });
+  </script>
+</body>
+</html>

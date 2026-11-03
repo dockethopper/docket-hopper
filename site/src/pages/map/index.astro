@@ -1,0 +1,28 @@
+---
+import Site from "../../layouts/Site.astro";
+import site from "../../data/site.json";
+import { billLabel, fmt, ord } from "../../lib/ui.js";
+import { LEGEND } from "../../lib/map.js";
+const base = import.meta.env.BASE_URL;
+const F = site.network;
+const [c, t, n] = F.id.split("-");
+const meta = { url: `${base}data/net/${c}/${t}/${n}.json`, base, label: `${billLabel(F.id)} · ${F.name.length > 40 ? F.name.slice(0, 38) + "…" : F.name}` };
+---
+<Site title="Map of bill connections · Docket Hopper" section="map" nav="map" page={4} description={F.claim}
+  note="A link is any relationship recorded in the bill status data [1]: identical, related, procedural, or text included. Positions are computed when the site is built.">
+  <div><h1 class="claim" style="max-width:38ch">{F.claim}</h1>
+    <p class="sub">Each dot is one bill. A line means Congress.gov records a relationship between the two. Click a dot to see the bill. Every bill page links to its own map.</p></div>
+  <div><div class="exh-h"><span class="n">Exhibit 1</span><b>Bills linked to {billLabel(F.id)} within two steps,</b> <span class="u">one dot per bill, sized by cosponsors</span></div>
+    <div class="net-wrap" id="net"><div class="overlay" hidden></div></div>
+    <Fragment set:html={LEGEND} />
+    <div class="net-list" id="net-list"></div></div>
+  <div><div class="label" style="margin-bottom:8px">Laws by policy area · enacted bills only, linked where the record links them</div>
+    <ul class="area-list">{site.areas.map((a) => <li><a href={`${base}map/area/${a.slug}/`}>{a.area}</a> <span class="muted">· {fmt(a.n)} laws</span></li>)}</ul></div>
+  <script is:inline type="application/json" id="map-meta" set:html={JSON.stringify(meta)} />
+  <script>
+    import { drawMap } from "../../lib/map.js";
+    import { dataOf } from "../../lib/charts.js";
+    const M = dataOf("map-meta");
+    fetch(M.url).then((r) => r.json()).then((J) => drawMap(document.getElementById("net"), J, { base: M.base, centerLabel: M.label, listEl: document.getElementById("net-list") }));
+  </script>
+</Site>

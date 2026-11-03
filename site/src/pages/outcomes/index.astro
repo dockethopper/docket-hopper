@@ -1,0 +1,98 @@
+---
+import Site from "../../layouts/Site.astro";
+import site from "../../data/site.json";
+import { fmt, pct, ord } from "../../lib/ui.js";
+const O = site.outcomes, Mo = site.model;
+const nV = O.vetoes.length, nO = O.vetoes.filter((v) => v.status === "veto_overridden").length;
+const last = site.cur - 1;
+const mm = O.maj_min;
+const data = { O, Mo, cur: site.cur, congresses: site.congresses, pres: site.pres, base: import.meta.env.BASE_URL };
+---
+<Site title="Outcomes · Docket Hopper" section="outcomes" nav="outcomes" page={6} description={O.claim}
+  note="Bills and joint resolutions only. Vetoes include pocket vetoes recorded in the bill status data [1]. Laws counted on the date they became law.">
+  <div><h1 class="claim" style="max-width:40ch">{O.claim}</h1>
+    <p class="sub">Bills and joint resolutions, 113th to {ord(last)} Congress. {pct(O.rate_bip)} of bills with a cross-party cosponsor became law, against {pct(O.rate_one)} of the rest.</p></div>
+  <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 1</span><b>Share of bills that became law, by cosponsor count,</b> <span class="u">percent of bills introduced, 113th–{ord(last)}</span></div><div class="chart" id="c-bip"></div>
+      <div class="legend"><span><i class="sw" style="background:var(--grey-l);border-radius:0"></i>One party only</span><span><i class="sw" style="background:var(--accent);border-radius:0"></i>At least one cross-party cosponsor</span></div></div>
+    <div class="sowhat"><div class="label">So what</div><p><b>Cosponsor count alone predicts little.</b> Volume of support is not breadth of support: one-party bills with many cosponsors pass less often than bipartisan bills with a few.</p><p><b>Breadth carries weight in our model too.</b> Cross-party cosponsorship is one of the passage model's inputs, alongside whether the sponsor is in the majority.</p><p><b>Majority sponsors still win more.</b> {pct(mm.majority.law / mm.majority.n)} of majority-party bills became law, against {pct(mm.minority.law / mm.minority.n)} for the minority.</p></div></div>
+  <div class="grid2e"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 2</span><b>{nV} vetoes since 2013, {nO} overridden,</b> <span class="u">one mark per vetoed bill</span></div><div class="chart" id="c-veto"></div></div>
+    <div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 3</span><b>Days from introduction to law,</b> <span class="u">median and middle half, by Congress</span></div><div class="chart" id="c-days"></div></div></div>
+  <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 4</span><b>Passage model's track record on the {ord(Mo.test_congress)} Congress,</b> <span class="u">predicted vs. actual share enacted, rated at introduction; trained on 113th–{ord(Mo.test_congress - 1)} only [4]</span></div><div class="chart" id="c-cal"></div></div>
+    <div class="sowhat"><div class="label">So what</div><p><b>The model ranks well.</b> Given a random enacted bill and a random failed one, it rates the enacted one higher {Math.round(Mo.auc * 100)}% of the time (AUC {Mo.auc.toFixed(2)}).</p><p><b>Its percentages run high.</b> In every band, fewer bills passed than predicted. This is why the directory shows bands, not percentages. The live model is retrained each night on every completed Congress.</p></div></div>
+  <script is:inline type="application/json" id="out-data" set:html={JSON.stringify(data).replace(/</g, "\\u003c")} />
+  <script>
+    import { scaleBand, scaleLinear } from "d3-scale";
+    import { svg, css, showTip, hideTip, dataOf } from "../../lib/charts.js";
+    import { esc, fmt, pct, ord, billLabel } from "../../lib/ui.js";
+    const { O, Mo, cur, congresses, pres, base } = dataOf("out-data");
+    {
+      const B = ["0", "1–4", "5–19", "20–49", "50+"], data = O.cos_bucket.map((r) => ({ ...r, rate: r.law / r.n }));
+      const W = 560, H = 250, m = { t: 24, r: 10, b: 40, l: 40 };
+      const x0 = scaleBand().domain(B).range([m.l, W - m.r]).padding(0.25), x1 = scaleBand().domain(["one-party", "bipartisan"]).range([0, x0.bandwidth()]).padding(0.08);
+      const y = scaleLinear().domain([0, Math.max(0.1, ...data.map((d) => d.rate)) * 1.1]).nice().range([H - m.b, m.t]);
+      const s = svg("#c-bip", W, H, "Enactment rate by cosponsor count, one-party versus bipartisan");
+      s.append("g").selectAll("line").data(y.ticks(5)).join("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y).attr("y2", y).attr("stroke", css("--rule"));
+      s.append("g").selectAll("text").data(y.ticks(5)).join("text").attr("class", "t2").attr("x", m.l - 6).attr("y", (d) => y(d) + 4).attr("text-anchor", "end").attr("font-size", 11.5).text((d) => pct(d, 0));
+      s.append("g").selectAll("rect").data(data).join("rect").attr("x", (d) => x0(d.bucket) + x1(d.kind)).attr("y", (d) => y(d.rate)).attr("width", x1.bandwidth()).attr("height", (d) => y(0) - y(d.rate)).attr("fill", (d) => (d.kind === "bipartisan" ? css("--accent") : css("--grey-l")))
+        .on("mousemove", (e, d) => showTip(e, `${d.bucket} cosponsors · ${d.kind}<br><b>${pct(d.rate)}</b> became law (${fmt(d.law)} of ${fmt(d.n)})`)).on("mouseleave", hideTip);
+      s.append("g").selectAll("text").data(data).join("text").attr("class", (d) => (d.kind === "bipartisan" ? "" : "t2")).attr("x", (d) => x0(d.bucket) + x1(d.kind) + x1.bandwidth() / 2).attr("y", (d) => y(d.rate) - 6).attr("text-anchor", "middle").attr("font-size", (d) => (d.kind === "bipartisan" ? 12 : 11)).attr("font-weight", (d) => (d.kind === "bipartisan" ? 600 : 400)).text((d) => pct(d.rate));
+      s.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(0)).attr("y2", y(0)).attr("stroke", css("--ink"));
+      s.append("g").selectAll("text.b").data(B).join("text").attr("class", "t2").attr("x", (d) => x0(d) + x0.bandwidth() / 2).attr("y", H - m.b + 18).attr("text-anchor", "middle").attr("font-size", 12).text((d) => d);
+      s.append("text").attr("class", "t2").attr("x", (m.l + W - m.r) / 2).attr("y", H - 4).attr("text-anchor", "middle").attr("font-size", 11.5).text("Number of cosponsors");
+    }
+    {
+      // O2: vetoes in amber, the exception color; hollow = overridden
+      const cs = congresses, W = 440, H = Math.max(200, cs.length * 34 + 30), m = { t: 14, r: 16, b: 22, l: 98 };
+      const y = scaleBand().domain(cs).range([m.t, H - m.b]).padding(0.3);
+      const s = svg("#c-veto", W, H, "Vetoes by Congress");
+      cs.forEach((c) => {
+        const vs = O.vetoes.filter((v) => v.congress === c), yy = y(c) + y.bandwidth() / 2;
+        const step = Math.min(20, (W - m.l - m.r - 40) / Math.max(1, vs.length));
+        s.append("text").attr("class", "t2").attr("x", m.l - 10).attr("y", yy + 4).attr("text-anchor", "end").attr("font-size", 12).text(`${ord(c)}${pres[c] ? " · " + pres[c] : ""}`);
+        s.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", yy).attr("y2", yy).attr("stroke", css("--rule"));
+        s.append("g").selectAll("a").data(vs).join("a").attr("href", (d) => { const [cc, t, n] = d.bill_id.split("-"); return `${base}bills/${cc}/${t}/${n}/`; })
+          .append("circle").attr("cx", (d, i) => m.l + 10 + i * step).attr("cy", yy).attr("r", 6.5)
+          .attr("fill", (d) => (d.status === "veto_overridden" ? css("--paper") : css("--amber"))).attr("stroke", css("--amber")).attr("stroke-width", 2)
+          .on("mousemove", (e, d) => showTip(e, `<b>${billLabel(d.bill_id)}</b>${d.status === "veto_overridden" ? " · overridden" : ""}<br>${esc(d.title.length > 110 ? d.title.slice(0, 110) + "…" : d.title)}`)).on("mouseleave", hideTip);
+        s.append("text").attr("x", m.l + 10 + vs.length * step + (vs.length ? 2 : -10)).attr("y", yy + 4).attr("font-size", 12).attr("font-weight", 600).text(vs.length || "0");
+      });
+      const lg = s.append("g").attr("transform", `translate(${m.l},${H - 4})`);
+      lg.append("circle").attr("cx", 6).attr("cy", -4).attr("r", 5).attr("fill", css("--paper")).attr("stroke", css("--amber")).attr("stroke-width", 2);
+      lg.append("text").attr("class", "t2").attr("x", 16).attr("y", 0).attr("font-size", 11.5).text("Hollow: veto overridden by Congress");
+    }
+    {
+      const cs = congresses.filter((c) => O.days_to_law[c]), dd = cs.map((c) => ({ c, ...O.days_to_law[c] }));
+      const W = 440, H = Math.max(200, cs.length * 34 + 30), m = { t: 14, r: 70, b: 30, l: 98 };
+      const y = scaleBand().domain(cs).range([m.t, H - m.b]).padding(0.3), x = scaleLinear().domain([0, Math.max(600, ...dd.map((d) => d.p75))]).nice().range([m.l, W - m.r]);
+      const s = svg("#c-days", W, H, "Days from introduction to law, by Congress");
+      s.append("g").selectAll("line").data(x.ticks(4)).join("line").attr("x1", x).attr("x2", x).attr("y1", m.t).attr("y2", H - m.b).attr("stroke", css("--rule"));
+      s.append("g").selectAll("text").data(x.ticks(4)).join("text").attr("class", "t2").attr("x", x).attr("y", H - 10).attr("text-anchor", "middle").attr("font-size", 11.5).text((d) => (d === 0 ? "0 days" : d));
+      dd.forEach((d) => {
+        const yy = y(d.c) + y.bandwidth() / 2, col = d.c === cur ? css("--accent") : css("--grey");
+        s.append("text").attr("class", "t2").attr("x", m.l - 10).attr("y", yy + 4).attr("text-anchor", "end").attr("font-size", 12).text(`${ord(d.c)}` + (d.c === cur ? " (so far)" : ""));
+        s.append("line").attr("x1", x(d.p25)).attr("x2", x(d.p75)).attr("y1", yy).attr("y2", yy).attr("stroke", col).attr("stroke-width", 6).attr("stroke-opacity", 0.45);
+        s.append("circle").attr("cx", x(d.median)).attr("cy", yy).attr("r", 5).attr("fill", col).attr("stroke", css("--paper")).attr("stroke-width", 2)
+          .on("mousemove", (e) => showTip(e, `${ord(d.c)} Congress<br>Median <b>${Math.round(d.median)}</b> days · middle half ${Math.round(d.p25)}–${Math.round(d.p75)} · ${d.n} laws`)).on("mouseleave", hideTip);
+        s.append("text").attr("x", x(d.p75) + 8).attr("y", yy + 4).attr("font-size", 12).text(Math.round(d.median) + (d.c === cs[0] ? " median" : ""));
+      });
+    }
+    {
+      const cal = Mo.calibration.filter((c) => c.n >= 50), lab = (c) => `${pct(c.lo, 0)}–${pct(Math.min(c.hi, 1), 0)}`;
+      const W = 560, H = 230, m = { t: 24, r: 10, b: 40, l: 40 };
+      const xa = scaleBand().domain(cal.map(lab)).range([m.l, W - m.r]).padding(0.3), xb = scaleBand().domain(["pred", "actual"]).range([0, xa.bandwidth()]).padding(0.08);
+      const ya = scaleLinear().domain([0, Math.max(0.16, ...cal.map((c) => c.pred)) * 1.1]).nice().range([H - m.b, m.t]);
+      const s = svg("#c-cal", W, H, "Model calibration: predicted versus actual share enacted");
+      s.append("g").selectAll("line").data(ya.ticks(4)).join("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", ya).attr("y2", ya).attr("stroke", css("--rule"));
+      s.append("g").selectAll("text").data(ya.ticks(4)).join("text").attr("class", "t2").attr("x", m.l - 6).attr("y", (d) => ya(d) + 4).attr("text-anchor", "end").attr("font-size", 11.5).text((d) => pct(d, 0));
+      const bars = cal.flatMap((c) => [{ c, k: "pred", v: c.pred }, { c, k: "actual", v: c.actual }]);
+      s.append("g").selectAll("rect").data(bars).join("rect").attr("x", (d) => xa(lab(d.c)) + xb(d.k)).attr("y", (d) => ya(d.v)).attr("width", xb.bandwidth()).attr("height", (d) => ya(0) - ya(d.v)).attr("fill", (d) => (d.k === "actual" ? css("--accent") : css("--grey-l")))
+        .on("mousemove", (e, d) => showTip(e, `Model said ${lab(d.c)} · ${fmt(d.c.n)} bills<br>Predicted <b>${pct(d.c.pred)}</b> · actually enacted <b>${pct(d.c.actual)}</b>`)).on("mouseleave", hideTip);
+      s.append("g").selectAll("text").data(bars).join("text").attr("x", (d) => xa(lab(d.c)) + xb(d.k) + xb.bandwidth() / 2).attr("y", (d) => ya(d.v) - 6).attr("text-anchor", "middle").attr("font-size", 11.5).attr("font-weight", (d) => (d.k === "actual" ? 600 : 400)).text((d) => pct(d.v));
+      s.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", ya(0)).attr("y2", ya(0)).attr("stroke", css("--ink"));
+      s.append("g").selectAll("text.k").data(cal).join("text").attr("class", "t2").attr("x", (c) => xa(lab(c)) + xa.bandwidth() / 2).attr("y", H - m.b + 18).attr("text-anchor", "middle").attr("font-size", 12).text((c) => `Rated ${lab(c)}`);
+      const lg = s.append("g").attr("transform", `translate(${m.l},${H - 6})`);
+      lg.append("rect").attr("width", 10).attr("height", 10).attr("y", -9).attr("fill", css("--grey-l")); lg.append("text").attr("class", "t2").attr("x", 15).attr("font-size", 11.5).text("Predicted");
+      lg.append("rect").attr("x", 90).attr("width", 10).attr("height", 10).attr("y", -9).attr("fill", css("--accent")); lg.append("text").attr("class", "t2").attr("x", 105).attr("font-size", 11.5).text("Actually enacted");
+    }
+  </script>
+</Site>

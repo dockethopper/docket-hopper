@@ -5,6 +5,8 @@
     python -m ingest sync --congress 118-119
     python -m ingest textstats --limit 5000           # word counts for "longest/shortest" sort
     python -m ingest stats                            # quick summary of what is in the DB
+    python -m ingest gdelt --max-calls 150            # news coverage for active bills, spaced calls
+    python -m ingest export --out site                # JSON for the static site (also records odds history)
 """
 
 from __future__ import annotations
@@ -48,9 +50,19 @@ def main(argv: list[str] | None = None) -> None:
     t = sub.add_parser("textstats")
     t.add_argument("--limit", type=int)
     t.add_argument("--workers", type=int, default=8)
+    t.add_argument("--minutes", type=float, help="stop after this long (nightly backfill budget)")
     t.add_argument("--keep-text", action="store_true", help="save full text of enacted/vetoed bills")
 
     sub.add_parser("stats")
+
+    g = sub.add_parser("gdelt")
+    g.add_argument("--max-calls", type=int, default=150)
+    g.add_argument("--spacing", type=float, default=20.0, help="seconds between GDELT calls")
+    g.add_argument("--minutes", type=float, default=55.0, help="stop after this long")
+
+    e = sub.add_parser("export")
+    e.add_argument("--out", default=str(ROOT / "site"))
+    e.add_argument("--workers", type=int)
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -65,7 +77,15 @@ def main(argv: list[str] | None = None) -> None:
             for bt in args.types.split(","):
                 govinfo.sync(conn, c, bt, workers=args.workers)
     elif args.cmd == "textstats":
-        textstats.run(conn, limit=args.limit, workers=args.workers, keep_text_dir=(ROOT / "data" / "text") if args.keep_text else None)
+        textstats.run(conn, limit=args.limit, workers=args.workers, minutes=args.minutes,
+                      keep_text_dir=(ROOT / "data" / "text") if args.keep_text else None)
+    elif args.cmd == "gdelt":
+        from . import gdelt
+        cur = conn.execute("SELECT MAX(congress) FROM bills").fetchone()[0]
+        gdelt.run(conn, cur, max_calls=args.max_calls, spacing=args.spacing, minutes=args.minutes)
+    elif args.cmd == "export":
+        from . import export
+        export.run(conn, Path(args.out), workers=args.workers)
     elif args.cmd == "stats":
         print("bills:", conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0])
         for r in conn.execute("SELECT congress, COUNT(*) n FROM bills GROUP BY congress ORDER BY congress"):

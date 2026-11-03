@@ -1,0 +1,5 @@
+{
+  "119-hr-1": {"query": "\"One Big Beautiful Bill\" sourcecountry:US", "note": "Official title is the reconciliation boilerplate; known everywhere by its short name."},
+  "119-s-1582": {"query": "\"GENIUS Act\" stablecoin sourcecountry:US", "note": "Short acronym name; require the subject word."},
+  "119-hr-22": {"query": "\"SAVE Act\" (citizenship OR voter) sourcecountry:US", "note": "Many unrelated 'SAVE Act' stories; require the subject."}
+}

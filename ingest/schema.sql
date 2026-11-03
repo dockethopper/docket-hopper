@@ -119,3 +119,44 @@ CREATE TABLE IF NOT EXISTS file_state (
     path          TEXT PRIMARY KEY,   -- e.g. "118/hr/BILLSTATUS-118hr815.xml"
     last_modified TEXT NOT NULL
 );
+
+-- Stage 2 (site) additions ---------------------------------------------------
+
+-- Headlines for a bill from the GDELT DOC API (links only, never article text).
+CREATE TABLE IF NOT EXISTS media_articles (
+    bill_id   TEXT NOT NULL REFERENCES bills(bill_id) ON DELETE CASCADE,
+    url       TEXT NOT NULL,
+    title     TEXT,
+    domain    TEXT,
+    seen_date TEXT,
+    PRIMARY KEY (bill_id, url)
+);
+
+-- What the coverage job did for each bill: the query it ran, when, and whether the
+-- name was judged too generic to count (M3 match check).
+CREATE TABLE IF NOT EXISTS media_state (
+    bill_id     TEXT PRIMARY KEY REFERENCES bills(bill_id) ON DELETE CASCADE,
+    query       TEXT,
+    generic     INTEGER NOT NULL DEFAULT 0,
+    fetched_at  TEXT,
+    status      TEXT                          -- ok | empty | error
+);
+
+-- Passage-odds history (B3). One row each time an active bill's stage or band changes,
+-- so a bill page can say "rated Typical at introduction, Strong after passing the House".
+CREATE TABLE IF NOT EXISTS odds_history (
+    bill_id  TEXT NOT NULL REFERENCES bills(bill_id) ON DELETE CASCADE,
+    day      TEXT NOT NULL,
+    stage    INTEGER NOT NULL,   -- 0 introduced, 1 reported, 2 passed one chamber, 3 passed both
+    p        REAL NOT NULL,
+    band     INTEGER NOT NULL,   -- 0 long shot, 1 typical, 2 better than most, 3 strong
+    PRIMARY KEY (bill_id, day)
+);
+
+-- Cached network-map layouts (N3), keyed by the bill whose neighborhood it is.
+-- sig changes when the neighborhood's nodes, links or dot sizes change.
+CREATE TABLE IF NOT EXISTS net_layout (
+    key  TEXT PRIMARY KEY,
+    sig  TEXT NOT NULL,
+    xy   TEXT NOT NULL
+);

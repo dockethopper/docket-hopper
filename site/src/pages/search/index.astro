@@ -1,0 +1,50 @@
+---
+import Site from "../../layouts/Site.astro";
+import site from "../../data/site.json";
+import { fmt } from "../../lib/ui.js";
+const base = import.meta.env.BASE_URL;
+---
+<Site title="Search bills · Docket Hopper" section="search" nav="bills" page={2} note="Searches titles, bill numbers and sponsor surnames across every Congress since 2013.">
+  <div><h1 class="claim" id="s-claim">Search {fmt(site.totals.bills)} bills since 2013</h1>
+    <form class="bigsearch" action={`${base}search/`} method="get" role="search" style="max-width:720px"><input id="dh-big" type="search" name="q" placeholder="Try “Laken Riley”, “H.R. 1” or a sponsor's surname" aria-label="Search bills" autofocus><kbd>/</kbd></form></div>
+  <div><p class="note" id="s-count" aria-live="polite"></p><ul class="results" id="s-results"></ul></div>
+  <script is:inline type="application/json" id="s-meta" set:html={JSON.stringify({ base, url: `${base}data/search.json`, cur: site.cur })} />
+  <script>
+    import { dataOf } from "../../lib/charts.js";
+    import { esc, fmt, ord, billLabel, billPath, track, LABEL } from "../../lib/ui.js";
+    const M = dataOf("s-meta");
+    const q = new URLSearchParams(location.search).get("q") || "";
+    const input = document.getElementById("dh-big") as HTMLInputElement;
+    input.value = q;
+    const out = document.getElementById("s-results"), cnt = document.getElementById("s-count");
+    const TYPES = Object.fromEntries(Object.entries(LABEL).map(([k, v]) => [v.replace(/\./g, "").toLowerCase(), k]));
+    const norm = (s) => s.toLowerCase().replace(/[.’'"]/g, "").replace(/\s+/g, " ").trim();
+    function parseNumber(s) {
+      // "H.R. 1", "hr1", "S 5", "hjres 7", optionally with a Congress "118th"
+      const m = norm(s).match(/^(?:(\d{3})(?:th)?\s*)?(h\s?con\s?res|s\s?con\s?res|h\s?j\s?res|s\s?j\s?res|h\s?res|s\s?res|hr|s)\s?(\d+)$/);
+      if (!m) return null;
+      return { c: m[1] ? +m[1] : null, t: TYPES[m[2].replace(/\s/g, "")] || m[2].replace(/\s/g, ""), n: m[3] };
+    }
+    if (!q.trim()) { cnt.textContent = "Type a title, bill number or sponsor."; }
+    else {
+      cnt.textContent = "Searching…";
+      fetch(M.url).then((r) => r.json()).then((J) => {
+        const num = parseNumber(q), terms = norm(q).split(" ").filter((w) => w.length > 1);
+        let hits = [];
+        for (const [id, title, sponsor, status] of J.rows) {
+          const [c, t, n] = id.split("-");
+          let score = 0;
+          if (num && num.t === t && num.n === n && (!num.c || num.c === +c)) score = 100 + (+c === M.cur ? 5 : 0);
+          else if (terms.length) {
+            const hay = norm(title + " " + sponsor);
+            if (terms.every((w) => hay.includes(w))) score = 10 + (norm(title).includes(norm(q)) ? 10 : 0) + (+c === M.cur ? 2 : 0) + (["became_law", "veto_overridden"].includes(status) ? 3 : 0);
+          }
+          if (score) hits.push({ id, title, sponsor, status, score, c: +c });
+        }
+        hits.sort((a, b) => b.score - a.score || b.c - a.c);
+        cnt.textContent = hits.length ? `${fmt(hits.length)} ${hits.length === 1 ? "bill" : "bills"} match “${q}”${hits.length > 200 ? "; showing the first 200" : ""}` : `No bills match “${q}”.`;
+        out.innerHTML = hits.slice(0, 200).map((h) => `<li><span class="mono">${ord(h.c)} ${billLabel(h.id)}</span><span><a href="${M.base}${billPath(h.id)}">${esc(h.title)}</a><br><span class="muted" style="font-size:12.5px">${esc(h.sponsor)}</span></span><span>${track(h.status)}</span></li>`).join("");
+      }).catch(() => { cnt.textContent = "Search could not load. Try reloading the page."; });
+    }
+  </script>
+</Site>

@@ -1,0 +1,37 @@
+---
+// Pre-rendered pages for the current Congress and every law or veto. Other bills are
+// rendered in the browser by 404.astro from the same JSON, with the same code (lib/bill.js).
+import fs from "node:fs";
+import path from "node:path";
+import Site from "../../../../../layouts/Site.astro";
+import { billHTML, billClaim, billNote } from "../../../../../lib/bill.js";
+import { billLabel, ord } from "../../../../../lib/ui.js";
+
+export function getStaticPaths() {
+  const dir = path.join(process.cwd(), "src", "data", "pre");
+  const out = [];
+  for (const f of fs.readdirSync(dir)) {
+    if (!f.endsWith(".json")) continue;
+    for (const d of JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"))) {
+      out.push({ params: { congress: String(d.c), type: d.t, num: String(d.n) }, props: { d } });
+    }
+  }
+  if (process.env.DH_SAMPLE) return out.filter((_, i) => i % Number(process.env.DH_SAMPLE) === 0);
+  return out;
+}
+const { d } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const claim = billClaim(d);
+const charts = { odds: d.odds, media: d.media, status: d.status, ms: d.ms, intro: d.intro, past: d.c !== d.cur };
+---
+<Site title={`${billLabel(d.id)}: ${d.title.length > 90 ? d.title.slice(0, 88) + "…" : d.title} · Docket Hopper`} description={claim}
+  section="bills" nav="bills" page={3} sectionText={`Part I · Bills · ${ord(d.c)} ${billLabel(d.id).toUpperCase()}`} note={billNote}>
+  <Fragment set:html={billHTML(d, base)} />
+  <script type="application/json" id="bill-data" set:html={JSON.stringify(charts).replace(/</g, "\\u003c")} />
+  <script>
+    import { drawBillCharts, wireSummary } from "../../../../../lib/billcharts.js";
+    import { dataOf } from "../../../../../lib/charts.js";
+    drawBillCharts(dataOf("bill-data"));
+    wireSummary();
+  </script>
+</Site>
