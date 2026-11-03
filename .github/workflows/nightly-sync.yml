@@ -1,6 +1,11 @@
 # Nightly: pull the database from the "data" release, refetch bills that changed on govinfo,
 # fill word counts and news coverage a little more each night, publish the database back,
 # then build the Docket Hopper site and deploy it to GitHub Pages.
+#
+# Safety net: counts are recorded before the sync and compared after the export. If the data
+# shrank or went stale, the job stops before anything is published, so yesterday's database and
+# yesterday's site stay live. A dated backup goes to the "snapshots" release (7 nightly, 8 weekly),
+# and any failure opens (or comments on) an "alert" issue.
 name: nightly-sync
 
 on:
@@ -17,6 +22,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: nightly-sync
@@ -51,6 +57,8 @@ jobs:
         # First run only: the full 113th-to-now bulk pull takes about 5 minutes.
         run: |
           [ -f data/billboard.sqlite ] || python -m ingest bulk
+      - name: Record counts before the sync
+        run: python -m ingest health --save before.json
       - name: Sync changed bills (current Congress)
         run: python -m ingest sync
       - name: Word counts (newest Congress first, older ones over later nights)
@@ -62,15 +70,10 @@ jobs:
         run: python -m ingest gdelt --max-calls 150 --spacing 20 --minutes 55
       - name: Export site data (also records today's passage-odds bands)
         run: python -m ingest export --out site
+      - name: Pre-publish checks (stop here if the data shrank or went stale)
+        run: python -m ingest health --compare before.json
       - name: Summary
         run: python -m ingest stats
-      - name: Publish database
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gzip -kf data/billboard.sqlite
-          gh release view data >/dev/null 2>&1 || gh release create data --title "Bill database" --notes "Rolling SQLite snapshot, updated nightly."
-          gh release upload data data/billboard.sqlite.gz --clobber
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
@@ -86,6 +89,21 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site/dist
+      - name: Publish database and keep a dated backup
+        # Runs only after the checks and the site build passed.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          day=$(date -u +%F)
+          gzip -kf data/billboard.sqlite
+          gh release view data >/dev/null 2>&1 || gh release create data --latest=false --title "Bill database" --notes "Rolling SQLite snapshot, updated nightly."
+          gh release upload data data/billboard.sqlite.gz --clobber
+          cp data/billboard.sqlite.gz "data/billboard-$day.sqlite.gz"
+          gh release view snapshots >/dev/null 2>&1 || gh release create snapshots --latest=false --title "Database backups" --notes "Dated copies of the bill database: the last 7 nights and the last 8 Sundays. To restore, download one, rename it billboard.sqlite.gz and upload it to the data release."
+          gh release upload snapshots "data/billboard-$day.sqlite.gz" --clobber
+          for n in $(python -m ingest snapshots --today "$day" $(gh release view snapshots --json assets --jq '.assets[].name')); do
+            gh release delete-asset snapshots "$n" -y
+          done
 
   deploy:
     needs: sync
@@ -96,3 +114,27 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  alert:
+    # Any failure above opens an issue labelled "alert" (or comments on the open one),
+    # which emails everyone watching the repository.
+    needs: [sync, deploy]
+    if: failure()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create alert --color D93F0B --description "Automated failure alert" 2>/dev/null || true
+          n=$(gh issue list --label alert --state open --search "nightly-sync in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body "Failed again on $(date -u +%F): $RUN_URL"
+          else
+            gh issue create --label alert --title "nightly-sync failed" --body "The nightly job failed on $(date -u +%F). Yesterday's site and database are still live.
+
+          Run log: $RUN_URL
+
+          Close this issue once a nightly run succeeds again."
+          fi

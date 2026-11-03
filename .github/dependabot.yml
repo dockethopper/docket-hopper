@@ -1,0 +1,26 @@
+# Monthly update PRs for GitHub Actions, Python and npm packages. Each one runs the
+# "checks" workflow; merging them also keeps the repository active, so GitHub does not
+# switch off the scheduled jobs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /site
+    schedule:
+      interval: monthly
+    groups:
+      npm-minor:
+        update-types: ["minor", "patch"]

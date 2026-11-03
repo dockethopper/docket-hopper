@@ -49,3 +49,18 @@ same code (`src/lib/bill.js`, `src/lib/map.js`).
 release, builds the site and deploys it to GitHub Pages. Pages must be set to deploy from
 GitHub Actions (Settings → Pages → Source: GitHub Actions). The base path is read from Pages, so the
 site works at `zuzwan.github.io/billdistill/` now and at `dockethopper.com` once the custom domain is set.
+
+### Safety net
+
+- **Pre-publish checks.** The job records counts before the sync (`python -m ingest health --save`) and
+  compares after the export (`--compare`). If the bill count falls, any Congress shrinks, a law stops
+  being a law, summaries or links drop sharply, or the newest action is over 45 days old, the job stops
+  before publishing. Yesterday's database and site stay live.
+- **Backups.** Each successful night uploads `billboard-YYYY-MM-DD.sqlite.gz` to the `snapshots`
+  release, keeping the last 7 nights and the last 8 Sundays. To restore, download one, rename it
+  `billboard.sqlite.gz`, and upload it to the `data` release with `--clobber`.
+- **Alerts.** A failed nightly run, or a failed daily `site-health` check (site down, site not rebuilt
+  in two days, or the repo close to GitHub's 60-day idle cut-off for scheduled jobs), opens an issue
+  labelled `alert`. Watching the repo gets you the email.
+- **Pull requests.** `checks.yml` runs the Python and site tests plus a sample build (`DH_SAMPLE=50`)
+  against the published database. Dependabot opens grouped update PRs monthly.

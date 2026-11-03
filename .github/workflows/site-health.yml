@@ -1,0 +1,63 @@
+# Daily outside check on the live site: is it up, and did last night's data actually reach it?
+# Also warns before GitHub's 60-day rule switches off scheduled workflows on a quiet repository.
+# Any problem opens (or comments on) an issue labelled "alert".
+name: site-health
+
+on:
+  schedule:
+    - cron: "0 15 * * *"   # 10 or 11 a.m. Eastern, well after the nightly deploy
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check the live site
+        id: check
+        run: |
+          problems=""
+          site=$(gh api "repos/$GH_REPO/pages" --jq .html_url)
+          site="${site%/}/"
+          echo "Checking $site"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -L "$site" || echo 000)
+          [ "$code" = 200 ] || problems="$problems- Home page returned HTTP $code ($site)\n"
+          built=$(curl -fsSL "${site}data/status.json" | jq -r .built || echo "")
+          if [ -z "$built" ]; then
+            problems="$problems- Could not read ${site}data/status.json\n"
+          else
+            age=$(( ( $(date -u +%s) - $(date -u -d "$built" +%s) ) / 86400 ))
+            [ "$age" -le 1 ] || problems="$problems- The live site was last rebuilt on $built ($age days ago); check the nightly-sync runs\n"
+          fi
+          last=$(gh api "repos/$GH_REPO/commits/${{ github.event.repository.default_branch }}" --jq .commit.committer.date)
+          idle=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 86400 ))
+          [ "$idle" -lt 50 ] || problems="$problems- No commits for $idle days. GitHub turns off scheduled workflows after 60 quiet days; merge any small change (a Dependabot PR is enough) to reset the clock\n"
+          if [ -n "$problems" ]; then
+            printf "%b" "$problems" | tee problems.md
+            echo "failed=1" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "Site is up and current (built $built)."
+      - name: Open or update an alert issue
+        if: failure()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create alert --color D93F0B --description "Automated failure alert" 2>/dev/null || true
+          body="$(cat problems.md 2>/dev/null || echo '- The health check itself failed')
+
+          Run log: $RUN_URL"
+          n=$(gh issue list --label alert --state open --search "site-health in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body "$body"
+          else
+            gh issue create --label alert --title "site-health check failed" --body "$body"
+          fi

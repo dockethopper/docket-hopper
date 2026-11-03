@@ -461,6 +461,8 @@ def run(conn, out: Path, today: str | None = None, workers: int | None = None) -
         "prerendered": len(pre_ids),
     }
     _wjson(src / "site.json", site, pretty=True)
+    # Small public file the site-health workflow reads to tell whether the live site is current.
+    _wjson(out / "public" / "data" / "status.json", {"built": today, "data_date": data_date, "bills": totals["bills"], "laws": totals["laws"]})
     log.info("export done: %d pre-rendered bills, %d bill files, %d maps", len(pre_ids), totals["bills"] - len(pre_ids), len(hoods))
     return site
 
