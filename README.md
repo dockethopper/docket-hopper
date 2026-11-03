@@ -1,7 +1,7 @@
 # Docket Hopper
 
 A self-updating site about every bill in the U.S. Congress since 2013 (dockethopper.com).
-Repository name: `billdistill`. No AI anywhere in the pipeline: summaries come from the
+Repository: `dockethopper/docket-hopper`. No AI anywhere in the pipeline: summaries come from the
 Congressional Research Service, odds from a small statistical model, coverage from GDELT counts.
 
 ## Data (Python, `ingest/`)
@@ -48,7 +48,7 @@ same code (`src/lib/bill.js`, `src/lib/map.js`).
 `.github/workflows/nightly-sync.yml` syncs, backfills, exports, publishes the database to the `data`
 release, builds the site and deploys it to GitHub Pages. Pages must be set to deploy from
 GitHub Actions (Settings → Pages → Source: GitHub Actions). The base path is read from Pages, so the
-site works at `zuzwan.github.io/billdistill/` now and at `dockethopper.com` once the custom domain is set.
+site works at `dockethopper.github.io/docket-hopper/` now and at `dockethopper.com` once the custom domain is set.
 
 ### Safety net
 

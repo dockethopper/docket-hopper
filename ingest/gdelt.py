@@ -26,7 +26,7 @@ from .db import now
 
 log = logging.getLogger("ingest.gdelt")
 API = "https://api.gdeltproject.org/api/v2/doc/doc"
-UA = "DocketHopper/1.0 (+https://github.com/zuzwan/billdistill)"
+UA = "DocketHopper/1.0 (+https://github.com/dockethopper/docket-hopper)"
 ALIASES = Path(__file__).with_name("media_aliases.json")
 LABEL = {"hr": "H.R.", "s": "S.", "hjres": "H.J.Res.", "sjres": "S.J.Res."}
 
