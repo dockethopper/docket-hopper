@@ -1,0 +1,102 @@
+---
+import Site from "../../../layouts/Site.astro";
+import site from "../../../data/site.json";
+import { ord, STAGES } from "../../../lib/ui.js";
+export function getStaticPaths() {
+  return site.congresses.map((c) => ({ params: { congress: String(c) } }));
+}
+const c = Number(Astro.params.congress);
+const meta = site.dir.find((d) => d.congress === c);
+const base = import.meta.env.BASE_URL;
+const years = (k) => `${2013 + 2 * (k - 113)}–${2015 + 2 * (k - 113)}`;
+---
+<Site title={`Bills of the ${ord(c)} Congress · Docket Hopper`} section="bills" nav="bills" page={2}
+  sectionText={`Part I · Bills · ${ord(c)} Congress`}
+  description={meta.claim}
+  note="Odds are bands from the passage model [4]; see Outcomes for its track record. Length is the word count of the latest text version, filled in over several nights. Press counts only articles that also name the sponsor or bill number.">
+  <div><h1 class="claim" style="max-width:40ch">{meta.claim}</h1>
+    <p class="sub">Bills and joint resolutions. Simple and concurrent resolutions are mostly ceremonial and never go to the president, so they are hidden unless you ask for them.</p></div>
+  <div class="filters">
+    <select id="f-cong" aria-label="Congress">{[...site.congresses].reverse().map((k) => <option value={k} selected={k === c}>{ord(k)} Congress ({years(k)})</option>)}</select>
+    <select id="f-stage" aria-label="Stage"><option value="all">Any stage</option>{STAGES.map((s, i) => <option value={i}>{s}</option>)}<option value="veto">Vetoed</option></select>
+    <select id="f-area" aria-label="Policy area"><option value="all">Any policy area</option></select>
+    <input id="f-q" type="search" placeholder="Filter by title, number or sponsor" aria-label="Filter by title, number or sponsor">
+    <label class="cb"><input type="checkbox" id="f-res"> Include resolutions</label>
+  </div>
+  <div><div class="exh-h"><span class="n">Exhibit 1</span><b>Bills and joint resolutions of the {ord(c)} Congress,</b> <span class="u" id="dir-unit">sortable; loading…</span></div>
+    <div class="tbl-wrap"><table class="dir"><thead><tr>
+      <th data-k="id" scope="col"><button>Bill</button></th><th data-k="title" scope="col"><button>Title and sponsor</button></th><th data-k="intro" scope="col"><button>Introduced</button></th><th data-k="stage" scope="col"><button>Stage</button></th>
+      <th data-k="cos" class="r" scope="col"><button>Cosponsors</button></th><th data-k="words" class="r" scope="col"><button>Length</button></th><th data-k="press" class="r" scope="col"><button>Press · 90d</button></th><th data-k="band" scope="col"><button>Odds</button></th>
+    </tr></thead><tbody id="dir-body"><tr><td colspan="8" class="muted">Loading bills…</td></tr></tbody></table></div></div>
+  <div class="pager"><span id="dir-count" aria-live="polite"></span>
+    <span class="pbtn"><button class="btn ghost" id="pg-prev">← Previous</button><button class="btn ghost" id="pg-next">Next →</button></span>
+    <span>Cosponsor bar: <span class="bar bip" style="width:18px"></span> includes the other party · <span class="bar" style="width:18px"></span> one party only</span></div>
+  <script is:inline type="application/json" id="dir-meta" set:html={JSON.stringify({ c, url: `${base}data/dir/${c}.json`, base })} />
+  <script>
+    import { dataOf } from "../../../lib/charts.js";
+    import { esc, fmt, track, odds, party, stageOf, isVeto, LABEL } from "../../../lib/ui.js";
+    const M = dataOf("dir-meta");
+    const PAGE = 50;
+    let rows = [], areas = [], sort = { k: "cos", dir: -1 }, page = 0;
+    const f = { q: "", stage: "all", area: "all", res: false };
+    const $ = (id) => document.getElementById(id);
+    const label = (r) => `${LABEL[r.t] || r.t} ${r.n}`;
+    const val = (d, k) => k === "stage" ? stageOf(d.status) * 10 + (d.status === "became_law" ? 1 : 0)
+      : k === "press" ? (d.press == null || d.press < 0 ? null : d.press)
+      : k === "band" ? (d.band ?? (stageOf(d.status) === 4 ? 5 : null))
+      : k === "id" ? d.t + String(d.n).padStart(6, "0") : d[k];
+    function render() {
+      const q = f.q.toLowerCase().replace(/\./g, "").trim();
+      let list = rows.filter((d) => (f.res || !d.res)
+        && (f.stage === "all" || (f.stage === "veto" ? isVeto(d.status) || d.status === "veto_overridden" : stageOf(d.status) === +f.stage))
+        && (f.area === "all" || d.area === +f.area)
+        && (!q || d.hay.includes(q)));
+      list.sort((a, b) => { const va = val(a, sort.k), vb = val(b, sort.k); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return (va < vb ? -1 : va > vb ? 1 : 0) * sort.dir; });
+      const pages = Math.max(1, Math.ceil(list.length / PAGE)); page = Math.min(page, pages - 1);
+      const shown = list.slice(page * PAGE, page * PAGE + PAGE);
+      const maxC = Math.max(1, ...rows.map((d) => d.cos));
+      $("dir-count").textContent = list.length ? `Showing ${fmt(page * PAGE + 1)}–${fmt(page * PAGE + shown.length)} of ${fmt(list.length)} bills` : "No bills match these filters";
+      $("pg-prev").disabled = page === 0; $("pg-next").disabled = page >= pages - 1;
+      $("dir-body").innerHTML = shown.map((d) => `<tr><td class="mono" style="white-space:nowrap">${label(d)}</td>
+        <td class="tc"><a class="t" href="${M.base}bills/${M.c}/${d.t}/${d.n}/">${esc(d.title)}</a><span class="a">${esc(d.sponsor)} ${party(d.party, d.state)} · ${esc(areas[d.area] ?? "No policy area yet")}</span></td>
+        <td class="num" style="white-space:nowrap">${d.introFmt}</td><td style="white-space:nowrap">${track(d.status)}</td>
+        <td class="r num" style="white-space:nowrap">${d.cos}<span class="bar ${d.bip > 0 ? "bip" : ""}" style="width:${Math.max(2, Math.round(60 * Math.sqrt(d.cos / maxC)))}px"></span></td>
+        <td class="r num">${d.words ? fmt(d.words) : "<span class='muted'>—</span>"}</td>
+        <td class="r num">${d.press == null ? "<span class='muted'>—</span>" : d.press < 0 ? "<span class='muted' title='Name too generic to count reliably'>—</span>" : fmt(d.press)}</td>
+        <td>${odds(d.band, d.status)}</td></tr>`).join("");
+      document.querySelectorAll("table.dir th").forEach((th) => {
+        const on = th.dataset.k === sort.k, b = th.querySelector("button");
+        if (on) th.setAttribute("aria-sort", sort.dir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort");
+        b.innerHTML = b.textContent.replace(/[▲▼]\s*$/, "").trim() + (on ? ` <span class="arr" aria-hidden="true">${sort.dir > 0 ? "▲" : "▼"}</span>` : "");
+      });
+    }
+    const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    fetch(M.url).then((r) => r.json()).then((J) => {
+      areas = J.areas;
+      const ix = Object.fromEntries(J.cols.map((c, i) => [c, i]));
+      rows = J.rows.map((r) => {
+        const [t, n] = r[ix.id].split("-");
+        const d = { t, n: +n, title: r[ix.title], sponsor: r[ix.sponsor], party: r[ix.party], state: r[ix.state], intro: r[ix.intro], status: r[ix.status], cos: r[ix.cos], bip: r[ix.bip], words: r[ix.words], area: r[ix.area], press: r[ix.press], band: r[ix.band], res: r[ix.res] };
+        const [y, m, dd] = (d.intro || "").split("-").map(Number); d.introFmt = y ? `${MON[m - 1]} ${dd}, ${y}` : "—";
+        d.hay = `${(LABEL[t] || t).replace(/\./g, "")} ${n} ${t}${n} ${d.title} ${d.sponsor}`.toLowerCase().replace(/\./g, "");
+        return d;
+      });
+      const used = new Set(rows.map((r) => r.area));
+      $("f-area").innerHTML += areas.map((a, i) => used.has(i) ? `<option value="${i}">${esc(a)}</option>` : "").join("");
+      $("dir-unit").textContent = `sortable; ${fmt(rows.filter((r) => !r.res).length)} bills and joint resolutions, ${fmt(rows.filter((r) => r.res).length)} resolutions`;
+      const p = new URLSearchParams(location.search);
+      if (p.get("q")) { f.q = p.get("q"); $("f-q").value = f.q; }
+      render();
+    }).catch(() => { $("dir-body").innerHTML = `<tr><td colspan="8">Could not load the bill list. Try reloading the page.</td></tr>`; });
+    document.querySelectorAll("table.dir th button").forEach((b) => b.addEventListener("click", () => {
+      const k = b.closest("th").dataset.k; sort = { k, dir: sort.k === k ? -sort.dir : ["title", "id"].includes(k) ? 1 : -1 }; page = 0; render();
+    }));
+    $("f-stage").onchange = (e) => { f.stage = e.target.value; page = 0; render(); };
+    $("f-area").onchange = (e) => { f.area = e.target.value; page = 0; render(); };
+    $("f-q").oninput = (e) => { f.q = e.target.value; page = 0; render(); };
+    $("f-res").onchange = (e) => { f.res = e.target.checked; page = 0; render(); };
+    $("f-cong").onchange = (e) => { location.href = `${M.base}bills/${e.target.value}/`; };
+    $("pg-prev").onclick = () => { page--; render(); scrollTo({ top: document.querySelector(".tbl-wrap").offsetTop - 20 }); };
+    $("pg-next").onclick = () => { page++; render(); scrollTo({ top: document.querySelector(".tbl-wrap").offsetTop - 20 }); };
+  </script>
+</Site>

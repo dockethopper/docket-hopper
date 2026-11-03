@@ -1,25 +1,45 @@
-# Nightly: pull the database from the latest "data" release, refetch bills that
-# changed on govinfo, add word counts for new text, and publish the database back.
-# The site build (added in Stage 2) will run after this job.
+# Nightly: pull the database from the "data" release, refetch bills that changed on govinfo,
+# fill word counts and news coverage a little more each night, publish the database back,
+# then build the Docket Hopper site and deploy it to GitHub Pages.
 name: nightly-sync
 
 on:
   schedule:
     - cron: "17 7 * * *"   # 07:17 UTC daily, after govinfo's overnight refresh
   workflow_dispatch:
+    inputs:
+      skip_slow:
+        description: "Skip the word-count and news-coverage steps (quick site rebuild)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nightly-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Python tests
+        run: python -m pytest tests -q
       - name: Download current database
         env:
           GH_TOKEN: ${{ github.token }}
@@ -33,8 +53,15 @@ jobs:
           [ -f data/billboard.sqlite ] || python -m ingest bulk
       - name: Sync changed bills (current Congress)
         run: python -m ingest sync
-      - name: Word counts for new text
-        run: python -m ingest textstats --limit 3000
+      - name: Word counts (newest Congress first, older ones over later nights)
+        if: ${{ !inputs.skip_slow }}
+        run: python -m ingest textstats --minutes 45
+      - name: News coverage (GDELT, spaced calls; stops early if throttled)
+        if: ${{ !inputs.skip_slow }}
+        continue-on-error: true
+        run: python -m ingest gdelt --max-calls 150 --spacing 20 --minutes 55
+      - name: Export site data (also records today's passage-odds bands)
+        run: python -m ingest export --out site
       - name: Summary
         run: python -m ingest stats
       - name: Publish database
@@ -44,3 +71,28 @@ jobs:
           gzip -kf data/billboard.sqlite
           gh release view data >/dev/null 2>&1 || gh release create data --title "Bill database" --notes "Rolling SQLite snapshot, updated nightly."
           gh release upload data data/billboard.sqlite.gz --clobber
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Test and build site
+        working-directory: site
+        env:
+          SITE_URL: ${{ steps.pages.outputs.origin }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: |
+          npm ci
+          npm test
+          npx astro build
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/dist
+
+  deploy:
+    needs: sync
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

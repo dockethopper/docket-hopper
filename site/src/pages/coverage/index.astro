@@ -1,0 +1,50 @@
+---
+import Site from "../../layouts/Site.astro";
+import site from "../../data/site.json";
+import { fmt, fdate } from "../../lib/ui.js";
+const base = import.meta.env.BASE_URL;
+const C = site.coverage;
+const rows = [...C.rows, ...C.generic];
+const st = C.stats;
+---
+<Site title="Coverage versus action · Docket Hopper" section="coverage" nav="coverage" page={5} description={C.claim}
+  note="An article counts if it names the bill and also names its sponsor or bill number. Names that still match unrelated stories are flagged instead of counted.">
+  <div><h1 class="claim" style="max-width:40ch">{C.claim}</h1>
+    <p class="sub">Left side: US news articles in the last 90 days that name the bill [3]. Right side: how far the bill has moved and who supports it [1]. This is a ledger of attention against action, not a measure of political slant.</p></div>
+  <div class="chart"><div class="exh-h"><span class="n">Exhibit 1</span><b>Attention versus action, {rows.length} bills,</b> <span class="u">articles in 90 days beside stage and cosponsors; click a column to sort</span></div>
+    <table class="ledger" id="ledger"><thead>
+      <tr><th class="side att" colspan="3">Attention · how much it is covered</th><th class="side act div" colspan="3">Action · how far it has moved</th></tr>
+      <tr><th>Bill</th><th data-k="total"><button>Articles, 90 days</button></th><th>Weekly trend</th><th class="div" data-k="stage"><button>Stage</button></th><th data-k="cos"><button>Cosponsors</button></th><th>Match quality</th></tr></thead>
+      <tbody><tr><td colspan="6" class="muted">{rows.length ? "Loading…" : `Coverage tracking ${st.first ? `started ${fdate(st.first)}` : "starts with the first nightly run"}. GDELT's free search allows a few hundred bills a night and looks back only three months, so this ledger fills in over the first weeks.`}</td></tr></tbody></table></div>
+  <div class="grid2e"><div class="sowhat"><p><b>The ledger is the page.</b> Each row puts a bill's coverage beside its record, so a reader sees at once which bills are noise and which are quietly moving.</p><p><b>Sorting flips the story.</b> Sorted by coverage, the top rows are fights. Sorted by stage, the top rows are laws almost nobody wrote about.</p></div>
+    <div class="sowhat"><p><b>Match quality matters.</b> Rows flagged amber have names that also match unrelated stories, so they show no number until a hand-checked search confirms them.</p>
+    <p><b>Coverage so far.</b> {fmt(st.tracked || 0)} bills searched, {fmt(st.with_coverage || 0)} with at least one article in 90 days, {fmt(st.generic || 0)} names flagged as too generic. History starts {st.first ? fdate(st.first) : "at launch"}.</p></div></div>
+  <script is:inline type="application/json" id="cov-data" set:html={JSON.stringify({ rows, base })} />
+  <script>
+    import { dataOf, css } from "../../lib/charts.js";
+    import { esc, fmt, track, billLabel, billPath, stageOf } from "../../lib/ui.js";
+    const D = dataOf("cov-data");
+    const tb = document.querySelector("#ledger tbody");
+    let sort = { k: "total", dir: -1 };
+    const maxT = Math.max(1, ...D.rows.map((r) => r.total || 0)), maxC = Math.max(1, ...D.rows.map((r) => r.cos || 0));
+    function spark(v) {
+      if (!v.length) return "<span class='muted'>—</span>";
+      const W = 110, H = 24, m = Math.max(...v, 1), x = (i) => 2 + (i * (W - 4)) / Math.max(1, v.length - 1), y = (d) => H - 2 - ((H - 4) * d) / m;
+      const p = v.map((d, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(d).toFixed(1)}`).join("");
+      return `<svg width="${W}" height="${H}" role="img" aria-label="Weekly article counts"><path d="${p}V${H - 2}H2Z" fill="${css("--accent-l")}"/><path d="${p}" fill="none" stroke="${css("--accent")}" stroke-width="1.5"/><circle cx="${x(v.length - 1)}" cy="${y(v.at(-1))}" r="2.5" fill="${css("--accent")}"/></svg>`;
+    }
+    const val = (r, k) => (k === "stage" ? stageOf(r.status) : r[k]);
+    function render() {
+      if (!D.rows.length) return;
+      const rows = [...D.rows].sort((a, b) => { const va = val(a, sort.k), vb = val(b, sort.k); if (va == null) return 1; if (vb == null) return -1; return (va - vb) * sort.dir || (b.total || 0) - (a.total || 0); });
+      tb.innerHTML = rows.map((r) => `<tr><td><a class="t" href="${D.base}${billPath(r.id)}">${esc(r.title)}</a><br><span class="mono muted">${billLabel(r.id)}</span></td>
+        <td class="num" style="white-space:nowrap">${r.total == null ? "<span class='muted'>—</span>" : `<svg width="130" height="12" style="vertical-align:middle" aria-hidden="true"><rect x="0" y="1" height="10" width="${Math.max(2, (120 * r.total) / maxT)}" fill="${css("--grey")}"/></svg> ${fmt(r.total)}`}</td>
+        <td>${spark(r.weeks)}</td><td class="div" style="white-space:nowrap">${track(r.status)}</td>
+        <td class="num" style="white-space:nowrap">${r.cos}<span class="bar ${r.bip > 0 ? "bip" : ""}" style="width:${Math.max(2, Math.round(50 * Math.sqrt(r.cos / maxC)))}px"></span></td>
+        <td>${r.generic ? `<span class="flag">Name matches other stories</span>` : `<span class="chip">Name and sponsor match</span>`}</td></tr>`).join("");
+      document.querySelectorAll("#ledger th[data-k]").forEach((th) => { const on = th.dataset.k === sort.k, b = th.querySelector("button"); b.innerHTML = b.textContent.replace(/[▲▼]\s*$/, "").trim() + (on ? ` <span class="arr">${sort.dir > 0 ? "▲" : "▼"}</span>` : ""); if (on) th.setAttribute("aria-sort", sort.dir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort"); });
+    }
+    document.querySelectorAll("#ledger th[data-k] button").forEach((b) => b.addEventListener("click", () => { const k = b.closest("th").dataset.k; sort = { k, dir: sort.k === k ? -sort.dir : -1 }; render(); }));
+    render();
+  </script>
+</Site>

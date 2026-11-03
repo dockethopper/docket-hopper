@@ -1,0 +1,59 @@
+---
+// GitHub Pages serves this file for any path it has no page for. Bills that are not
+// pre-rendered, and every bill's network map, are drawn here from the JSON export.
+import Site from "../layouts/Site.astro";
+import { LEGEND } from "../lib/map.js";
+const base = import.meta.env.BASE_URL;
+---
+<Site title="Docket Hopper" section="" page={0}>
+  <div id="fallback"><p class="muted">Loading…</p></div>
+  <template id="tpl-map"><div><h1 class="claim" style="max-width:38ch" id="map-claim"></h1>
+    <p class="sub">Each dot is one bill. A line means Congress.gov records a relationship between the two. Click a dot to see the bill.</p></div>
+    <div><div class="exh-h"><span class="n">Exhibit 1</span><b id="map-exh"></b> <span class="u">one dot per bill, sized by cosponsors</span></div>
+    <div class="net-wrap" id="net"><div class="overlay" hidden></div></div><Fragment set:html={LEGEND} /><div class="net-list" id="net-list"></div></div></template>
+  <script is:inline type="application/json" id="fb-meta" set:html={JSON.stringify({ base })} />
+  <script>
+    import { dataOf } from "../lib/charts.js";
+    import { billHTML, billClaim, billNote } from "../lib/bill.js";
+    import { drawBillCharts, wireSummary } from "../lib/billcharts.js";
+    import { drawMap, networkClaim, rows } from "../lib/map.js";
+    import { billLabel, ord, esc, SOURCES } from "../lib/ui.js";
+    const { base } = dataOf("fb-meta");
+    const box = document.getElementById("fallback");
+    const rel = location.pathname.startsWith(base) ? location.pathname.slice(base.length) : location.pathname.replace(/^\//, "");
+    const m = rel.match(/^(bills|map)\/(\d{3})\/([a-z]+)\/(\d+)\/?$/);
+    const set = (sec, pg, note) => { document.getElementById("dh-section").textContent = sec; document.getElementById("dh-pg").textContent = pg; if (note != null) document.getElementById("dh-note").textContent = `Note: ${note} ${SOURCES}`; };
+    const notFound = () => { document.title = "Page not found · Docket Hopper"; set("Not found", "00"); box.innerHTML = `<h1 class="claim">There is no page at this address</h1><p class="sub">Try the <a href="${base}search/">search</a> or the <a href="${base}bills/">bill directory</a>.</p>`; };
+    if (!m) notFound();
+    else {
+      const [, kind, c, t, n] = m, id = `${c}-${t}-${n}`;
+      if (kind === "bills") {
+        fetch(`${base}data/bill/${c}/${t}/${n}.json`).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
+          document.title = `${billLabel(d.id)}: ${d.title.length > 90 ? d.title.slice(0, 88) + "…" : d.title} · Docket Hopper`;
+          set(`Part I · Bills · ${ord(d.c)} ${billLabel(d.id).toUpperCase()}`, "03", billNote);
+          document.querySelector("nav a")?.classList.add("on");
+          box.outerHTML = `<div style="display:contents">${billHTML(d, base)}</div>`;
+          drawBillCharts({ ...d, past: d.c !== d.cur }); wireSummary();
+          if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+        }).catch(notFound);
+      } else {
+        fetch(`${base}data/net/${c}/${t}/${n}.json`).then((r) => (r.ok ? r.json() : Promise.reject())).then((J) => {
+          const center = rows(J).find((x) => x.id === J.center);
+          const name = center && center.title.length <= 70 && !/^(to |a bill|an act)/i.test(center.title) ? center.title : billLabel(id);
+          document.title = `Map: ${billLabel(id)} · Docket Hopper`;
+          set("Part II · Connections", "04", "A link is any relationship recorded in the bill status data [1]: identical, related, procedural, or text included. Positions are computed when the site is built.");
+          document.querySelectorAll("nav a")[1]?.classList.add("on");
+          box.outerHTML = document.getElementById("tpl-map").innerHTML;
+          document.getElementById("map-claim").textContent = networkClaim(name, J);
+          document.getElementById("map-exh").textContent = `Bills linked to ${billLabel(id)} (${ord(+c)} Congress) within two steps,`;
+          drawMap(document.getElementById("net"), J, { base, centerLabel: `${billLabel(id)}${name !== billLabel(id) ? " · " + (name.length > 40 ? name.slice(0, 38) + "…" : name) : ""}`, listEl: document.getElementById("net-list") });
+        }).catch(() => {
+          fetch(`${base}bills/${c}/${t}/${n}/`, { method: "HEAD" }).then(() => {
+            set("Part II · Connections", "04");
+            box.innerHTML = `<h1 class="claim">${esc(billLabel(id))} has no recorded links to other bills</h1><p class="sub"><a href="${base}bills/${c}/${t}/${n}/">Back to the bill</a>.</p>`;
+          }).catch(notFound);
+        });
+      }
+    }
+  </script>
+</Site>

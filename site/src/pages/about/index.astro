@@ -1,0 +1,40 @@
+---
+import Site from "../../layouts/Site.astro";
+import site from "../../data/site.json";
+import { fmt, pct, ord, fdate } from "../../lib/ui.js";
+const T = site.totals, Mo = site.model;
+const bands = Mo.bands;
+---
+<Site title="About the data · Docket Hopper" section="about" nav="about" page={7}
+  description="Where Docket Hopper's numbers come from, how they update, and what they cannot tell you.">
+  <div><h1 class="claim" style="max-width:40ch">Everything here comes from public records and simple statistics; nothing is written by AI</h1>
+    <p class="sub">{fmt(T.bills)} bills and resolutions from the {ord(site.congresses[0])} Congress (2013) to now, {pct(T.with_summary / T.bills, 0)} with a CRS summary, {fmt(T.links)} recorded links between bills. Data through {fdate(site.data_date)}.</p></div>
+  <div class="prose">
+    <h2>Sources</h2>
+    <ol>
+      <li><b>Bill status</b> from Congress.gov, via the Government Publishing Office's <a href="https://www.govinfo.gov/bulkdata/BILLSTATUS">govinfo bulk data</a>: titles, sponsors, cosponsors, actions, committees, subjects, related bills and text versions.</li>
+      <li><b>Summaries</b> written by the nonpartisan Congressional Research Service and published with the bill status data. "What it changes" on each bill page is this text, unedited.</li>
+      <li><b>News coverage</b> from the <a href="https://www.gdeltproject.org/">GDELT Project</a> DOC API. We store article counts and headline links, never article text.</li>
+      <li><b>Passage odds</b> from Docket Hopper's own statistical model, described below.</li>
+    </ol>
+    <h2>How it updates</h2>
+    <p>Every night a GitHub Action downloads the bills govinfo changed, collects news coverage for a few hundred active bills (GDELT allows only slow, spaced requests), counts words in newly published bill text, rates every active bill, and rebuilds this site. The full database is published as a SQLite file with each run.</p>
+    <h2>What counts as a bill</h2>
+    <p>Totals and rates count bills and joint resolutions (H.R., S., H.J.Res., S.J.Res.), the measures that can become law. Simple and concurrent resolutions, about {fmt(T.bills - T.leg)} since 2013, are mostly ceremonial; they are searchable and appear in the directory when you ask for them.</p>
+    <h2>Passage odds</h2>
+    <p>A logistic regression on facts known about a bill: whether the sponsor is in the majority, how many cosponsors it has, whether any come from the other party and how many, whether it has an identical companion in the other chamber, and its type. There is one version of the model for each stage a bill can reach, trained only on bills that reached that stage, so a bill that has passed the House is compared with other bills that passed a chamber. It is retrained each night on every completed Congress ({fmt(Mo.n_train)} bills).</p>
+    <p>Odds are shown as four bands, never as a percentage, because the model ranks bills well but its percentages run high. On the {ord(Mo.test_congress)} Congress, which a test copy of the model never saw, it rated an enacted bill above a failed one {Math.round(Mo.auc * 100)}% of the time (AUC {Mo.auc.toFixed(2)}). See <a href={`${import.meta.env.BASE_URL}outcomes/`}>Outcomes</a> for its full track record.</p>
+    <table class="plain"><thead><tr><th>Band</th><th>Model score</th><th class="r">Active bills now</th></tr></thead><tbody>
+      {bands.map(([lo, hi, name], i) => <tr><td>{name}</td><td>{pct(lo, 0)} to {pct(Math.min(hi, 1), 0)}</td><td class="r">{fmt(Mo.band_counts[String(i)] || 0)}</td></tr>)}
+    </tbody></table>
+    <p>A bill's band is recorded each time it reaches a new stage and never recomputed afterwards, so an enacted bill shows the ratings it had on the way, not a score fitted to what already happened. Ratings started when the site launched; bills decided before then have none.</p>
+    <h2>News coverage</h2>
+    <p>Searching for a bill's name is noisy: "SAVE Act" matches stories about saving money. An article counts only if it names the bill and also names its sponsor or bill number, with a short hand-checked list of search terms for famous bills. Names that are a single common word or a short acronym are flagged "name too generic" instead of given a number. GDELT's free search looks back about three months, so coverage history starts at launch.</p>
+    <h2>Bill length</h2>
+    <p>Length is the word count of a bill's latest text. It requires downloading each text once, so it is filled in a few hours a night, newest Congress first. {fmt(T.with_words)} of {fmt(T.bills)} bills have a count so far.</p>
+    <h2>What this site cannot tell you</h2>
+    <p>Whether a law worked, what a bill will do in practice, or whether coverage was favorable. Those need judgment this site does not attempt. "Outcomes" means what happened to bills in Congress, and how well our odds held up.</p>
+    <h2>Reuse</h2>
+    <p>The code and the nightly database are public at <a href="https://github.com/zuzwan/billdistill">github.com/zuzwan/billdistill</a>. Bill status and CRS summaries are U.S. government works.</p>
+  </div>
+</Site>

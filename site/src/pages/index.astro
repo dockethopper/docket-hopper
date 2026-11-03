@@ -1,0 +1,79 @@
+---
+import Site from "../layouts/Site.astro";
+import site from "../data/site.json";
+import { fmt, pct, ord, word, billLabel, billPath, fdate, esc } from "../lib/ui.js";
+const base = import.meta.env.BASE_URL;
+const cur = site.cur;
+const C = site.congress.find((c) => c.congress === cur);
+const SP = site.same_point;
+const L = site.landing;
+const prior = site.congresses.filter((c) => c !== cur);
+const stages = [
+  ["Introduced only", C.introduced - C.reported_plus],
+  ["Reported by committee", C.reported_plus - C.passed_one_plus],
+  ["Passed one chamber", C.passed_one_plus - C.passed_both_plus],
+  ["Passed both chambers, not yet law", C.passed_both_plus - C.enacted - C.vetoed_standing],
+  ["Vetoed", C.vetoed_standing],
+  ["Became law", C.enacted],
+];
+const chart = { same: site.congresses.map((c) => ({ k: c, v: SP[c] })), cur, day: site.day, stages };
+---
+<Site title="Docket Hopper: every bill in Congress since 2013" section="home" page={1}
+  note="Laws counted on the date they became public or private law. Simple and concurrent resolutions excluded.">
+  <div class="cover">
+    <div class="eyebrow">{ord(cur)} Congress · day {site.day} of 730</div>
+    <h1 class="cover-t">Every bill in Congress since 2013, read from the public record</h1>
+    <p class="cover-s">{fmt(site.totals.bills)} bills and resolutions, with nonpartisan CRS summaries, the links between them, and what became of them. Updated every night.</p>
+    <form class="bigsearch" action={`${base}search/`} method="get" role="search">
+      <input id="dh-big" type="search" name="q" placeholder="Search by title, bill number or sponsor" aria-label="Search bills"><kbd>/</kbd>
+    </form>
+  </div>
+  <div class="slide-b"><div style="min-width:0">
+    <h2 class="claim">{L.text}</h2>
+    <div style="margin-top:18px"><div class="exh-h"><span class="n">Exhibit 1</span><b>Laws enacted by day {site.day} of each Congress,</b> <span class="u">count of bills and joint resolutions</span></div><div class="chart" id="c-land"></div></div></div>
+    <div class="sowhat"><div class="label">So what</div>
+      {L.lead && <p><b>{L.lead}</b> A typical Congress since 2013 had {Math.round(site.prior_median)} laws by now. The {ord(cur - 1)} had {SP[cur - 1]}.</p>}
+      <p><b>Very little of what is introduced moves.</b> Of {fmt(C.introduced)} bills and joint resolutions, {fmt(C.passed_one_plus)} have passed either chamber and {pct(C.enacted / C.introduced)} have become law.</p>
+      <p><b>The comparison is like for like.</b> Each earlier Congress is counted at the same day of its term, not at its final total.</p>
+    </div></div>
+  <div><div class="exh-h"><span class="n">Exhibit 2</span><b>Where the {fmt(C.introduced)} bills of the {ord(cur)} Congress stand,</b> <span class="u">furthest stage reached, count</span></div><div class="chart" id="c-stage"></div></div>
+  <div class="grid2e">
+    <div><div class="label" style="margin-bottom:6px">Latest floor and chamber action</div><div class="list">
+      {site.moving.slice(0, 5).map((b) => <div class="row"><span class="mono">{billLabel(b.bill_id)}</span><div><a class="t" href={`${base}${billPath(b.bill_id)}`}>{b.title}</a><div class="m">{b.latest_action_text}</div></div><span class="d">{fdate(b.latest_action_date)}</span></div>)}
+    </div></div>
+    <div><div class="label" style="margin-bottom:6px">Recently signed into law</div><div class="list">
+      {site.recent_laws.slice(0, 5).map((b) => <div class="row"><span class="mono">{b.law_type === "Private Law" ? "Pvt. L." : "P.L."} {b.law_number}</span><div><a class="t" href={`${base}${billPath(b.bill_id)}`}>{b.title}</a><div class="m">{b.policy_area ? `${b.policy_area} · ` : ""}{billLabel(b.bill_id)}</div></div><span class="d">{fdate(b.latest_action_date)}</span></div>)}
+    </div></div>
+  </div>
+  <script type="application/json" id="land-data" set:html={JSON.stringify(chart)} />
+  <script>
+    import { scaleBand, scaleLinear } from "d3-scale";
+    import { max } from "d3-array";
+    import { svg, css, showTip, hideTip, dataOf } from "../lib/charts.js";
+    import { fmt, ord } from "../lib/ui.js";
+    const D = dataOf("land-data");
+    {
+      const data = D.same, W = 560, H = 230, m = { t: 22, r: 10, b: 30, l: 10 };
+      const x = scaleBand().domain(data.map((d) => d.k)).range([m.l, W - m.r]).padding(0.32);
+      const y = scaleLinear().domain([0, Math.max(260, max(data, (d) => d.v) * 1.1)]).range([H - m.b, m.t]);
+      const s = svg("#c-land", W, H, `Bar chart of laws enacted by day ${D.day} of each Congress`);
+      s.selectAll("rect").data(data).join("rect").attr("x", (d) => x(d.k)).attr("y", (d) => y(d.v)).attr("width", x.bandwidth()).attr("height", (d) => y(0) - y(d.v))
+        .attr("fill", (d) => (d.k === D.cur ? css("--accent") : css("--grey-l")))
+        .on("mousemove", (e, d) => showTip(e, `${ord(d.k)} Congress<br><b>${d.v}</b> laws by day ${D.day}`)).on("mouseleave", hideTip);
+      s.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(0)).attr("y2", y(0)).attr("stroke", css("--ink"));
+      s.selectAll("text.v").data(data).join("text").attr("x", (d) => x(d.k) + x.bandwidth() / 2).attr("y", (d) => y(d.v) - 7).attr("text-anchor", "middle").attr("font-size", 13).attr("font-weight", (d) => (d.k === D.cur ? 600 : 400)).text((d) => d.v);
+      s.selectAll("text.k").data(data).join("text").attr("class", "t2").attr("x", (d) => x(d.k) + x.bandwidth() / 2).attr("y", H - 9).attr("text-anchor", "middle").attr("font-size", 12).attr("font-weight", (d) => (d.k === D.cur ? 600 : 400)).text((d) => ord(d.k));
+    }
+    {
+      const st = D.stages, W = 760, H = st.length * 34 + 10, l = 250;
+      const x = scaleLinear().domain([0, max(st, (d) => d[1]) || 1]).range([0, W - l - 70]);
+      const s = svg("#c-stage", W, H, "Bills by furthest stage reached");
+      st.forEach((d, i) => {
+        const yy = 6 + i * 34, law = d[0] === "Became law", veto = d[0] === "Vetoed";
+        s.append("text").attr("x", l - 12).attr("y", yy + 15).attr("text-anchor", "end").attr("font-size", 13).attr("font-weight", law ? 600 : 400).text(d[0]);
+        s.append("rect").attr("x", l).attr("y", yy + 3).attr("height", 16).attr("width", Math.max(2, x(d[1]))).attr("fill", law ? css("--accent") : veto ? css("--amber") : css("--grey-l"));
+        s.append("text").attr("x", l + Math.max(2, x(d[1])) + 8).attr("y", yy + 15).attr("font-size", 13).attr("font-weight", law ? 600 : 400).text(fmt(d[1]));
+      });
+    }
+  </script>
+</Site>
