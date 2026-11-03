@@ -7,6 +7,9 @@
     python -m ingest stats                            # quick summary of what is in the DB
     python -m ingest gdelt --max-calls 150            # news coverage for active bills, spaced calls
     python -m ingest export --out site                # JSON for the static site (also records odds history)
+    python -m ingest health --save before.json        # record counts before the nightly sync
+    python -m ingest health --compare before.json     # block publishing if data shrank or went stale
+    python -m ingest snapshots --today 2026-11-04 NAME ...   # print backup names that can be deleted
 """
 
 from __future__ import annotations
@@ -64,7 +67,20 @@ def main(argv: list[str] | None = None) -> None:
     e.add_argument("--out", default=str(ROOT / "site"))
     e.add_argument("--workers", type=int)
 
+    h = sub.add_parser("health")
+    h.add_argument("--save")
+    h.add_argument("--compare")
+
+    sn = sub.add_parser("snapshots")
+    sn.add_argument("--today", required=True)
+    sn.add_argument("names", nargs="*")
+
     args = ap.parse_args(argv)
+    if args.cmd == "snapshots":
+        from . import health
+        print("\n".join(health.snapshots_to_delete(args.names, args.today)))
+        return
+
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     conn = db.connect(args.db)
 
@@ -86,6 +102,18 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "export":
         from . import export
         export.run(conn, Path(args.out), workers=args.workers)
+    elif args.cmd == "health":
+        from . import health
+        if args.save:
+            c = health.save(conn, Path(args.save))
+            print(f"health: saved counts ({c['bills']:,} bills, {c['laws']:,} laws, data through {c['data_date']})")
+        if args.compare:
+            problems = health.check(conn, Path(args.compare))
+            for p in problems:
+                print("::error title=Pre-publish check failed::" + p)
+            if problems:
+                raise SystemExit(1)
+            print("health: all pre-publish checks passed")
     elif args.cmd == "stats":
         print("bills:", conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0])
         for r in conn.execute("SELECT congress, COUNT(*) n FROM bills GROUP BY congress ORDER BY congress"):

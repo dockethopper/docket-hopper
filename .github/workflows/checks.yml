@@ -1,0 +1,55 @@
+# Runs on every pull request (and on main): Python tests, site tests, and a sample site build
+# against the published database. Branch protection requires the "checks" job to pass.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Python tests
+        run: python -m pytest tests -q
+      - name: Site tests
+        working-directory: site
+        run: |
+          npm ci
+          npm test
+      - name: Download the published database
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          gh release download data --pattern 'billboard.sqlite.gz' --dir data
+          gunzip -f data/billboard.sqlite.gz
+      - name: Export site data (checks every generated sentence against its numbers)
+        run: python -m ingest export --out site
+      - name: Sample site build (every 50th bill page)
+        working-directory: site
+        env:
+          DH_SAMPLE: "50"
+        run: |
+          npx astro build
+          test -f dist/index.html && test -f dist/404.html && test -f dist/data/status.json
