@@ -45,6 +45,21 @@ export function track(status) {
   for (let i = 0; i < 5; i++) h += `<i class="${i <= k ? (x && i === k ? "x" : "on") : ""}"></i>`;
   return h + `</span><span class="stage">${stageName(status)}</span>`;
 }
+// H9: link Congress terms in action text to the glossary on the How Congress works page.
+// Takes already-escaped text; links the first mention of each term.
+const GLOSS = [["suspend the rules", "suspension"], ["unanimous consent", "unanimous-consent"], ["cloture", "cloture"], ["discharged", "discharged"],
+  ["conference report", "conference"], ["pocket vetoed", "pocket-veto"], ["vetoed", "veto"], ["veto message", "veto"], ["reported", "reported"],
+  ["referred to", "referred"], ["presented to president", "enrolled"]];
+const GLOSS_RX = new RegExp(`\\b(${GLOSS.map(([w]) => w).join("|")})\\b`, "gi");
+export function glossify(html, base = "/") {
+  const used = new Set();
+  return html.replace(GLOSS_RX, (m) => {
+    const id = GLOSS.find(([w]) => w === m.toLowerCase())[1];
+    if (used.has(id)) return m;
+    used.add(id);
+    return `<a href="${base}how-it-works/#g-${id}">${m}</a>`;
+  });
+}
 export const party = (p, st) => (p ? `<span class="party">${esc(p)}${st ? "-" + esc(st) : ""}</span>` : "");
 
 // D2: odds as four bands, never a percentage.
@@ -58,5 +73,5 @@ export function odds(band, status) {
   return h + `</span>${BANDS[band]}</span>`;
 }
 
-export const SECTIONS = { home: "Home", bills: "Part I · Bills", map: "Part II · Connections", coverage: "Part III · Coverage", outcomes: "Part IV · Outcomes", about: "Notes · About the data", search: "Part I · Bills · Search" };
-export const SOURCES = "Source: [1] Congress.gov bill status, via govinfo bulk data. [2] Congressional Research Service summaries. [3] GDELT Project. [4] Docket Hopper passage model.";
+export const SECTIONS = { home: "Home", how: "Primer · How Congress works", bills: "Part I · Bills", map: "Part II · Connections", coverage: "Part III · Coverage", outcomes: "Part IV · Outcomes", about: "Notes · About the data", search: "Part I · Bills · Search" };
+export const SOURCES = "Source: [1] Congress.gov bill status, via govinfo bulk data. [2] Congressional Research Service summaries. [3] GDELT Project. [4] Docket Hopper passage model. [5] congress-legislators dataset.";

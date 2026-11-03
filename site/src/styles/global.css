@@ -4,6 +4,8 @@
 :root{
   --paper:#ffffff; --panel:#f3f4f6; --ink:#101218; --ink-2:#4a4e57; --grey:#868b95; --grey-l:#cdd0d6; --rule:#e3e5e9;
   --accent:#1747e0; --accent-l:#e9eefc; --accent-ink:#ffffff; --amber:#db8e00; --amber-l:#fbf3e3;
+  /* party colors: How Congress works, Part 1 only (H11). Everywhere else party is text (G2). */
+  --dem:#3a66c4; --rep:#c8473f; --ind:#868b95;
   --f-title:"Source Serif 4", Georgia, "Times New Roman", serif;
   --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-cond:"IBM Plex Sans Condensed", "Arial Narrow", "IBM Plex Sans", system-ui, sans-serif;
@@ -220,4 +222,42 @@ table.plain{border-collapse:collapse;font-size:13.5px;width:100%;max-width:720px
 table.plain th,table.plain td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:left}
 table.plain th{font-family:var(--f-cond);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 table.plain td.r,table.plain th.r{text-align:right}
+/* how congress works (H2: slide-style sections on one page) */
+.hw-slide{padding-block:8px 32px;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:22px}
+.hw-slide:last-of-type{border-bottom:0}
+.hw-slide .cover-t em{font-style:normal;color:var(--accent)}
+.hw-track{display:flex;gap:4px;align-items:center;font-family:var(--f-cond);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--grey);flex-wrap:wrap}
+.hw-track span{padding:2px 7px;border-top:3px solid var(--rule)}
+.hw-track span.on{border-top-color:var(--accent);color:var(--ink);font-weight:600}
+.hw-track span.done{border-top-color:var(--grey-l)}
+.hw-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;font-size:14px}
+.hw-tiles>div{border-top:1px solid var(--ink);padding-top:10px;min-width:0}
+.hw-tiles p{margin:6px 0 0}
+.hw-tiles b{font-weight:600}
+.hw-big{margin-top:16px}
+.hw-big b{display:block;color:var(--ink);font-family:var(--f-title);font-size:40px;line-height:1.05;margin-bottom:6px}
+.hw-big>div{font-family:var(--f-cond);font-size:13px;color:var(--ink-2)}
+@media (max-width:640px){.hw-tiles{grid-template-columns:minmax(0,1fr)}}
+.hw-scroll{overflow-x:auto}
+.hw-steps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;min-width:760px}
+.hw-steps div{font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--ink);padding-top:6px}
+.hw-steps a{display:block;font-family:var(--f-cond);font-size:13px;color:var(--ink);text-decoration:none}
+.hw-steps a:hover b{text-decoration:underline}
+.hw-steps b{font-weight:600}
+.hw-steps .k{font-family:var(--f-mono);font-size:11px;color:var(--grey)}
+.chart.hw-wide{overflow:visible}
+.chart.hw-wide svg{min-width:760px}
+.hw-lanes{display:flex;flex-direction:column;gap:16px}
+.hw-lanes .lab{font-family:var(--f-cond);font-size:13px;display:flex;justify-content:space-between;gap:12px;margin-bottom:4px;flex-wrap:wrap}
+.hw-lanes .lab b{font-weight:600}
+.hw-lanes .bar{display:flex;height:28px;gap:2px;margin:0;background:none;width:100%}
+.hw-lanes .bar i{display:block;height:100%}
+.sq{width:10px;height:10px;display:inline-block;flex:none}
+dl.hw-gloss{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 32px;margin:0}
+@media (max-width:760px){dl.hw-gloss{grid-template-columns:minmax(0,1fr)}}
+dl.hw-gloss div{border-top:1px solid var(--rule);padding:9px 0;font-size:14px;scroll-margin-top:16px}
+dl.hw-gloss div:target{background:var(--accent-l)}
+dl.hw-gloss dt{font-weight:600;font-family:var(--f-cond);font-size:14px}
+dl.hw-gloss dd{margin:2px 0 0;color:var(--ink-2)}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

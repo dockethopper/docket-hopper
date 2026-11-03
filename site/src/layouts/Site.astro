@@ -9,7 +9,7 @@ interface Props { title: string; description?: string; section: keyof typeof SEC
 const { title, description, section, nav, note, page, sectionText, canonical } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const sec = sectionText || SECTIONS[section] || "";
-const items = [["bills", "Bills", `${base}bills/${site.cur}/`], ["map", "Map", `${base}map/`], ["coverage", "Coverage", `${base}coverage/`], ["outcomes", "Outcomes", `${base}outcomes/`], ["about", "About the data", `${base}about/`]];
+const items = [["bills", "Bills", `${base}bills/${site.cur}/`], ["how", "How it works", `${base}how-it-works/`], ["map", "Map", `${base}map/`], ["coverage", "Coverage", `${base}coverage/`], ["outcomes", "Outcomes", `${base}outcomes/`], ["about", "About the data", `${base}about/`]];
 const desc = description || `Every bill in Congress since 2013, read from the public record. Updated nightly.`;
 ---
 <!doctype html>

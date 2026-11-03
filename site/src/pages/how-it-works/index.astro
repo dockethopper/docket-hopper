@@ -1,0 +1,439 @@
+---
+// How Congress works (decisions H1–H13): Part 1, the institution (seats by party, elections,
+// party control); Part 2, the path of a bill (stages, gates, timing, calendar, fast lanes).
+// Every number comes from how.json, written by `python -m ingest export` (ingest/howitworks.py).
+import Site from "../../layouts/Site.astro";
+import site from "../../data/site.json";
+import how from "../../data/how.json";
+import { fmt, pct, ord, fdate, word } from "../../lib/ui.js";
+
+const base = import.meta.env.BASE_URL;
+const P = how.path, A = P.all, T = how.titles, Mm = how.members, F = P.fast;
+const g = (k) => Math.round(P.gaps[k]?.med ?? 0);
+const yrs = `${P.years[0]} to ${P.years[1]}`;
+const span = `${ord(P.first)}–${ord(P.last)} Congress`;
+const dec = P.law_month[23], jan = P.law_month[24];
+const cnt = (seats, p) => (seats || []).filter((s) => s[0] === p).length;
+const hSeated = Mm ? Mm.house.length : 435;
+const range = (xs) => (xs.length === 1 ? fmt(xs[0]) : xs.length === 2 ? `${fmt(xs[0])} and ${fmt(xs[1])}` : `${fmt(xs[0])} to ${fmt(xs[xs.length - 1])}`);
+const unifiedN = T.unified_laws.length;
+// H8: each stage links to the directory of the last completed Congress, filtered to that stage.
+const dir = (s) => `${base}bills/${P.last}/?stage=${s}`;
+const STEPS = [
+  ["Introduced", "A member files the bill and it is referred to one or more committees.", 0],
+  ["Committee acts", "The committee holds a markup and reports it, or the chamber discharges it.", 1],
+  ["Passes its chamber", "A floor vote, or passage by suspension or unanimous consent.", 2],
+  ["Passes the other chamber", "The same text must pass. Differences go back and forth or to conference.", 3],
+  ["Goes to the President", "The enrolled bill is presented. The President has 10 days, Sundays excepted.", 3],
+  ["Becomes law", "Signed, or law without a signature. A veto needs two-thirds of both chambers to override.", 4],
+];
+const TRACK2 = ["Overview", "1 Introduced", "2 Committee", "3 First chamber", "4 Second chamber", "5 President", "6 Law"];
+// on: -1 = Overview, 0..5 = stages 1..6
+const tr2 = (on) => ["The Congress", ...TRACK2].map((l, i) => ({ l, on: on.includes(i - 2), done: i === 0 }));
+const tr1 = (k) => ["The Congress", "Chambers", "Elections", "Control", "The path of a bill"].map((l, i) => ({ l, on: i === k, done: i < k }));
+const data = { P, M: Mm, C: how.control, pres: site.pres, base, last: P.last };
+---
+<Site title="How Congress works · Docket Hopper" section="how" nav="how" page={8}
+  description={`How Congress is elected and organized, and the path a bill takes to become law, from ${fmt(A.intro)} real bills since ${P.years[0]}.`}
+  note={`Bills and joint resolutions only. The path of a bill counts the ${span}, which have finished. Seats as of ${fdate(Mm?.asof)}, from the congress-legislators dataset [5].`}>
+
+  <section class="hw-slide" id="congress">
+    <div class="hw-track">{tr1(0).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><div class="eyebrow">How Congress works</div>
+      <h1 class="cover-t" style="max-width:24ch">Congress is 535 elected members in two chambers. A bill becomes law only when both pass the same words.</h1>
+      <p class="sub">The House of Representatives has 435 voting members, each elected by one district. The Senate has 100, two from every state. Each chamber sets its own rules, and each needs more than a bare majority for some things.{Mm && ` Seats below are as of ${fdate(Mm.asof)}.`}</p></div>
+    {Mm ? <>
+      <div class="grid2e">
+        <div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 1</span><b>House of Representatives, {hSeated} seated,</b> <span class="u">one dot per member, by party; lines mark the votes needed</span></div><div class="chart" id="c-house"></div></div>
+        <div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 2</span><b>Senate, {Mm.senate.length} seated,</b> <span class="u">one dot per senator, by party; lines mark the votes needed</span></div><div class="chart" id="c-senate"></div></div>
+      </div>
+      <p class="sr">House: {cnt(Mm.house, "D")} Democrats, {cnt(Mm.house, "R")} Republicans, {cnt(Mm.house, "I")} independents. Senate: {cnt(Mm.senate, "D")} Democrats, {cnt(Mm.senate, "R")} Republicans, {cnt(Mm.senate, "I")} independents.</p>
+      <div class="legend"><span><i class="sw" style="background:var(--dem)"></i>Democrat</span><span><i class="sw" style="background:var(--rep)"></i>Republican</span><span><i class="sw" style="background:var(--ind)"></i>Independent{cnt(Mm.senate, "I") ? " (senators caucus with Democrats)" : ""}</span></div>
+    </> : <p class="note">Seat counts are not available in this build.</p>}
+    <div class="hw-tiles">
+      <div><div class="label">Simple majority</div><p><b>218 in the House, 51 in the Senate</b> (or 50 plus the Vice President) passes a bill under regular order, elects the Speaker and organizes committees. The majority party chairs every committee and controls what reaches the floor.</p></div>
+      <div><div class="label">60 senators</div><p><b>Cloture, to end debate.</b> Any senator can hold up most bills by refusing to stop debating, the filibuster. Ending it takes 60 votes, so most Senate bills need some support from the minority party.</p></div>
+      <div><div class="label">Two-thirds</div><p><b>290 in the House, 67 in the Senate</b> overrides a veto. Two-thirds of those voting also passes a House bill under suspension of the rules, the fast lane most House bills use.</p></div>
+    </div>
+  </section>
+
+  <section class="hw-slide" id="elections">
+    <div class="hw-track">{tr1(2).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><h2 class="claim">The whole House is elected every two years. Senators serve six, a third at a time.</h2>
+      <p class="sub">Each two-year term is one numbered Congress. It starts on January 3 after an election. Every bill not passed by the end of a Congress dies and has to be introduced again, which is why this site counts bills by Congress. House seats are divided among the states by population after each census.</p></div>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 3</span><b>Who is on the ballot, by election year,</b> <span class="u">each bar is one term of office; outlined terms end at the next election</span></div><div class="chart" id="c-cycle"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>The House turns over fastest.</b> All 435 seats are up every even year, so House majorities respond to the national mood within two years.</p>
+        <p><b>The Senate changes slowly by design.</b> Only about 33 seats are up in any election. Senators are split into three classes, and a class serves six years.</p>
+        <p id="nextel"></p></div></div>
+  </section>
+
+  <section class="hw-slide" id="control">
+    <div class="hw-track">{tr1(3).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><h2 class="claim">{T.control}</h2>
+      <p class="sub">The majority in each chamber decides which bills get a hearing and a vote. Control has often been split since {P.years[0]}.</p></div>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 4</span><b>Seats by party at the start of each Congress, and laws enacted,</b> <span class="u">House and Senate, {ord(P.first)}–{ord(site.cur)} Congress</span></div><div class="chart" id="c-control"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        {unifiedN > 0 && T.divided_laws.length > 0 && <p><b>Unified government passed more.</b> The {unifiedN === 1 ? "one completed Congress" : `${word(unifiedN)} completed Congresses`} where one party held both chambers and the presidency enacted {range(T.unified_laws)} laws; divided Congresses enacted {range(T.divided_laws)}.</p>}
+        <p><b>Majorities have been thin.</b> A shift of a handful of seats can change which party sets the agenda in either chamber.</p>
+        <p><b>Sponsors in the majority do better.</b> On the <a href={`${base}outcomes/`}>Outcomes page</a>, bills from majority-party sponsors become law far more often than bills from the minority.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="path">
+    <div class="hw-track">{tr2([-1]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><div class="eyebrow">The path of a bill</div>
+      <h2 class="cover-t" style="max-width:24ch">Of {fmt(A.intro)} bills introduced from {yrs}, <em>{fmt(A.law)}</em> became law.</h2>
+      <p class="sub">The rest of this page follows the route every bill takes through Congress and counts how many made it past each stage. It uses the {ord(P.first)} to {ord(P.last)} Congress, which have finished, so every bill here has a final outcome.</p></div>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 5</span><b>Every bill introduced, by the furthest stage it reached,</b> <span class="u">one square = 50 bills, {span}</span></div>
+        <div class="chart" id="c-grid"></div><div class="legend" id="lg-grid"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>{pct(P.far.intro / A.intro, 0)} of bills never left committee.</b> No committee report, no floor time. Introducing a bill is easy; a member needs only to drop it in the hopper.</p>
+        <p><b>Passing one chamber is not halfway.</b> Of bills that passed their own chamber, {pct(1 - A.p2 / A.p1, 0)} died in the other one.</p>
+        <p><b>The end of the route is nearly automatic.</b> Of the {fmt(A.p2)} bills that cleared both chambers, {fmt(A.law)} became law and {fmt(A.veto)} {A.veto === 1 ? "was" : "were"} vetoed.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="route">
+    <div class="hw-track">{tr2([0, 1, 2, 3, 4, 5]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><h2 class="claim">Every bill follows the same six stages, and the field narrows hardest at the first gate.</h2>
+      <p class="sub">House bills and Senate bills run the same route in mirror image. Band height is the number of bills still alive, drawn to one scale, so the thin blue sliver at the end is the true size of the law column.</p></div>
+    <div><div class="exh-h"><span class="n">Exhibit 6</span><b>The route, with bills remaining at each stage,</b> <span class="u">by the chamber where the bill started, {span}; stage names open the {ord(P.last)} Congress's bills at that stage</span></div>
+      <div class="hw-scroll"><div class="hw-steps">{STEPS.map(([t, d, s], i) => <div><span class="k">{i + 1}</span><a href={dir(s)}><b>{t}</b></a>{d}</div>)}</div>
+        <div class="chart hw-wide" id="c-route"></div></div>
+      <p class="note">Bills can skip a stage: {fmt(P.p1_no_committee)} bills passed a chamber with no recorded committee report or discharge, mostly Senate bills passed by unanimous consent soon after introduction. They are counted at every later stage they reached. Days below the route are the median time each leg took for the {fmt(A.law)} bills that became law.</p></div>
+  </section>
+
+  <section class="hw-slide" id="gates">
+    <div class="hw-track">{tr2([1, 2, 3]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <h2 class="claim">{T.gates}</h2>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 7</span><b>Share of bills at each stage that reached the next one,</b> <span class="u">percent, {span}</span></div><div class="chart" id="c-gates"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>Committee chairs decide most outcomes.</b> Only {pct(A.committee / A.intro, 0)} of bills get a committee report or discharge. A chair who never schedules a markup ends a bill without a vote.</p>
+        <p><b>The second chamber is the next wall.</b> Most bills that pass one chamber wait in the other until the Congress ends.</p>
+        <p><b>Vetoes are rare.</b> Presidents vetoed {fmt(A.veto)} bills in these Congresses. A bill that reaches the President has usually been negotiated with the White House already.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="clock">
+    <div class="hw-track">{tr2([0, 1, 2, 3, 4, 5]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <h2 class="claim">A typical law takes about {Math.round(g("intro_law") / 30.4)} months, and most of that time passes before the first floor vote.</h2>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 8</span><b>Days spent on each leg of the route,</b> <span class="u">median and middle half, the {fmt(A.law)} bills that became law</span></div><div class="chart" id="c-clock"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>The wait is up front.</b> The median law spent {g("intro_p1")} days between introduction and its first chamber vote, and {g("p1_p2")} more waiting on the other chamber.</p>
+        <p><b>The last two steps take about two weeks.</b> Enrolling and presenting the bill takes a median {g("p2_pres")} days, and the President signs a median {g("pres_law")} days later.</p>
+        <p><b>The spread is wide.</b> A quarter of laws took more than {fmt(P.gaps.intro_law.p75)} days, and some passed both chambers within a week of introduction.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="calendar">
+    <div class="hw-track">{tr2([5]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><h2 class="claim">{T.calendar}</h2>
+      <p class="sub">Each Congress lasts two years. Bills still pending when it ends die. The deadline pulls work to the end: the weeks after the election, the lame-duck session, are the busiest of the term.</p></div>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 9</span><b>Every law, from introduction to enactment, on one two-year calendar,</b> <span class="u">one line per law, sorted by enactment date; laws per month below</span></div><div class="chart" id="c-lines"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>{fmt(dec)} laws were enacted in the final December</b>, {pct(dec / A.law, 0)} of the total. Another {fmt(jan)} were signed in the January after, as Congress adjourned.</p>
+        <p><b>Introductions run the other way.</b> Members file the most bills in the first months of a Congress, when the field is open. Each grey line starts where its bill was filed.</p>
+        <p><b>The steep right edge is the deadline.</b> Bills from every month of the term converge on the same few weeks.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="fast">
+    <div class="hw-track">{tr2([2, 3]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <div><h2 class="claim">{T.fast}</h2>
+      <p class="sub">A contested bill in the House needs a rule from the Rules Committee and hours of debate. A contested bill in the Senate can face a filibuster that takes 60 votes to end. Most bills avoid both.</p></div>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 10</span><b>How bills passed the chamber where they started,</b> <span class="u">share of bills passed, {span}</span></div>
+        <div class="hw-lanes">{[["House bills passed by the House", F.house_susp, F.house_p1, "under suspension of the rules"], ["Senate bills passed by the Senate", F.senate_uc, F.senate_p1, "by unanimous consent"]].map(([l, a, b, how_]) =>
+          <div><div class="lab"><span><b>{l}</b>, {fmt(b)}</span><span><b class="num">{pct(a / b, 0)}</b> {how_}</span></div>
+            <div class="bar" title={`${fmt(a)} ${how_}; ${fmt(b - a)} regular order`}><i style={`width:${(a / b) * 100}%;background:var(--accent)`}></i><i style="flex:1;background:var(--grey-l)"></i></div></div>)}</div>
+        <div class="legend"><span><i class="sq" style="background:var(--accent)"></i>Fast lane</span><span><i class="sq" style="background:var(--grey-l)"></i>Regular order</span></div>
+        <div class="hw-tiles hw-big"><div><b class="num">{fmt(F.conference)}</b>laws went through a conference committee</div><div><b class="num">{fmt(F.pingpong)}</b>settled differences by trading amendments</div><div><b class="num">{fmt(F.laws - F.conference - F.pingpong)}</b>passed both chambers in identical form</div></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>House suspension</b> limits debate to 40 minutes, bars amendments, and needs a two-thirds vote. It is the default route for bills with broad support.</p>
+        <p><b>Senate unanimous consent</b> passes a bill with no roll call if no senator objects. One objection sends it back to the regular process.</p>
+        <p><b>Conference committees have nearly disappeared.</b> Only {fmt(F.conference)} laws went through one.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="trend">
+    <div class="hw-track">{tr2([0, 5]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <h2 class="claim">{T.trend}</h2>
+    <div class="grid2e"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 11</span><b>Bills introduced,</b> <span class="u">bills and joint resolutions per Congress</span></div><div class="chart" id="c-intro"></div></div>
+      <div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 12</span><b>Share that became law,</b> <span class="u">percent of bills introduced per Congress</span></div><div class="chart" id="c-rate"></div></div></div>
+    <p class="note">The {ord(site.cur)} Congress is still in session and is shown outlined, for context only; its bills can still move. It is left out of every exhibit in the path of a bill except these two and Exhibit 4.</p>
+  </section>
+
+  <section class="hw-slide" id="laws">
+    <div class="hw-track">{tr2([5]).map((t) => <span class={t.on ? "on" : t.done ? "done" : ""}>{t.l}</span>)}</div>
+    <h2 class="claim">{T.naming}</h2>
+    <div class="grid2"><div style="min-width:0"><div class="exh-h"><span class="n">Exhibit 13</span><b>Laws by policy area,</b> <span class="u">top ten areas assigned by the Congressional Research Service, {span}</span></div><div class="chart" id="c-policy"></div></div>
+      <div class="sowhat"><div class="label">So what</div>
+        <p><b>{P.policy[0]?.[0]} leads{P.naming_in_top / P.policy[0]?.[1] >= 0.5 ? " because of naming bills" : ""}.</b> {fmt(P.naming_in_top)} of its {fmt(P.policy[0]?.[1])} laws name a building or a place. Naming a post office alone accounts for {fmt(P.post_office)} laws.</p>
+        <p><b>Big policy moves in big packages.</b> Spending bills and the annual defense authorization carry the text of many smaller bills.</p>
+        <p><b>A bill that died may still have become law.</b> {fmt(P.twins)} bills that never passed had an identical companion bill that did.</p></div></div>
+  </section>
+
+  <section class="hw-slide" id="glossary">
+    <div><div class="eyebrow">Reference</div><h2 class="claim" style="margin-top:4px">Terms used on this site</h2></div>
+    <dl class="hw-gloss">
+      <div id="g-bill"><dt>Bill (H.R., S.)</dt><dd>A proposed law. H.R. starts in the House, S. in the Senate.</dd></div>
+      <div id="g-joint-resolution"><dt>Joint resolution (H.J.Res., S.J.Res.)</dt><dd>Works like a bill. Used for constitutional amendments, disapproving regulations and some spending.</dd></div>
+      <div id="g-referred"><dt>Referred</dt><dd>Sent to a committee for review. Nearly every bill is referred the day it is introduced.</dd></div>
+      <div id="g-reported"><dt>Markup and report</dt><dd>The committee amends the bill and votes to send it to the floor with a written report.</dd></div>
+      <div id="g-discharged"><dt>Discharged</dt><dd>Taken from a committee without its report, by consent or by petition.</dd></div>
+      <div id="g-suspension"><dt>Suspension of the rules</dt><dd>House fast lane: 40 minutes of debate, no amendments, two-thirds needed to pass.</dd></div>
+      <div id="g-unanimous-consent"><dt>Unanimous consent</dt><dd>Senate fast lane: passes with no roll call unless one senator objects.</dd></div>
+      <div id="g-cloture"><dt>Cloture</dt><dd>The Senate vote to end debate. Needs 60 votes for most bills.</dd></div>
+      <div id="g-conference"><dt>Conference</dt><dd>Members of both chambers write one final version. Now rare.</dd></div>
+      <div id="g-enrolled"><dt>Enrolled bill</dt><dd>The final text both chambers passed, printed and signed by their leaders for the President.</dd></div>
+      <div id="g-veto"><dt>Veto and override</dt><dd>The President returns the bill unsigned. Two-thirds of both chambers can make it law anyway.</dd></div>
+      <div id="g-pocket-veto"><dt>Pocket veto</dt><dd>If Congress adjourns within the 10 days and the President does not sign, the bill dies.</dd></div>
+    </dl>
+    <div><div class="label">Method</div>
+      <p class="note">Stages are read from each bill's action history [1]: committee reports and discharges, passage in each chamber, presentation to the President, and enactment. Fast lanes are House passages whose actions record a motion to suspend the rules and pass, and Senate passages recorded as by unanimous consent. Naming laws are titles that designate or name a facility, place or building, or authorize a commemorative coin. Party control uses the majority party of each chamber and the President's party; the Senate split of the {ord(117)} Congress counts the Vice President's tie-breaking vote. [5] congress-legislators, a public dataset of members of Congress maintained on GitHub.</p></div>
+  </section>
+
+  <script is:inline type="application/json" id="hw-data" set:html={JSON.stringify(data).replace(/</g, "\\u003c")} />
+  <script>
+    import { scaleLinear, scaleBand } from "d3-scale";
+    import { select, pointer } from "d3-selection";
+    import { line as d3line } from "d3-shape";
+    import { sum, max, range as d3range } from "d3-array";
+    import { svg, css, showTip, hideTip, dataOf } from "../../lib/charts.js";
+    import { fmt, pct, ord, billLabel } from "../../lib/ui.js";
+    const { P, M, C, pres, base, last } = dataOf("hw-data");
+    const A = P.all, PC = { D: "--dem", R: "--rep", I: "--ind", O: "--grey" }, PN = { D: "Democrat", R: "Republican", I: "Independent", O: "Other" };
+
+    // Exhibits 1–2: hemicycles, seats sorted by angle so each party is one wedge
+    function hemicycle(el, seats, total, thresholds, label) {
+      const W = 520, R = 222, cx = W / 2, cy = R + 40, big = total > 200, rows = big ? 12 : 6, r0 = R * (big ? 0.38 : 0.42);
+      const radii = d3range(rows).map((i) => r0 + ((R - r0) * i) / (rows - 1)), sumR = sum(radii);
+      const per = radii.map((r) => Math.round((total * r) / sumR)); per[rows - 1] += total - sum(per);
+      const pos = [];
+      radii.forEach((r, i) => { const n = per[i]; for (let j = 0; j < n; j++) { const a = Math.PI - (Math.PI * j) / Math.max(1, n - 1); pos.push({ a, x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) }); } });
+      pos.sort((p, q) => q.a - p.a);
+      const dotR = big ? 6 : 10, s = svg(el, W, cy + 34, label);
+      thresholds.forEach(([k, lab]) => {
+        const a = (pos[k - 1].a + pos[k].a) / 2, c = Math.cos(a), sn = Math.sin(a);
+        s.append("line").attr("x1", cx + (r0 - 24) * c).attr("y1", cy - (r0 - 24) * sn).attr("x2", cx + (R + 14) * c).attr("y2", cy - (R + 14) * sn).attr("stroke", css("--ink")).attr("stroke-dasharray", "3 2");
+        s.append("text").attr("class", "halo").attr("x", cx + (R + 18) * c).attr("y", cy - (R + 18) * sn).attr("text-anchor", c > 0.05 ? "start" : c < -0.05 ? "end" : "middle").attr("font-size", 12).text(lab);
+      });
+      s.selectAll("circle").data(pos).join("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", dotR)
+        .attr("fill", (d, i) => (seats[i] ? css(PC[seats[i][0]]) : css("--paper"))).attr("stroke", (d, i) => (seats[i] ? css("--paper") : css("--grey"))).attr("stroke-width", 1.5)
+        .on("mousemove", (e, d) => { const m = seats[pos.indexOf(d)]; showTip(e, m ? `${PN[m[0]]} · ${m[1]}${m[3] && m[3] !== m[0] ? ` · caucuses with ${PN[m[3]]}s` : ""}` : "Vacant seat"); }).on("mouseleave", hideTip);
+      const n = (p) => seats.filter((s) => s[0] === p).length;
+      s.append("text").attr("x", cx).attr("y", cy + 28).attr("text-anchor", "middle").attr("font-size", 15).attr("font-weight", 600)
+        .text(["D", "I", "R", "O"].filter(n).map((p) => `${n(p)} ${p}`).join(" · ") + (total > seats.length ? ` · ${total - seats.length} vacant` : ""));
+    }
+    if (M) {
+      // M.house/M.senate are sorted D, I, R, O by the export
+      hemicycle("#c-house", M.house, 435, [[218, "218 majority"], [290, "290 two-thirds"]], "House seats by party");
+      hemicycle("#c-senate", M.senate, 100, [[51, "51 majority"], [60, "60 cloture"], [67, "67 two-thirds"]], "Senate seats by party");
+    }
+
+    // Exhibit 3: election cycle
+    {
+      const asof = M?.asof || new Date().toISOString().slice(0, 10), ay = +asof.slice(0, 4);
+      const tues = (y) => { const d = new Date(Date.UTC(y, 10, 1)).getUTCDay(); return `${y}-11-${String(1 + ((8 - d) % 7) + 1).padStart(2, "0")}`; };
+      let ny = ay + (ay % 2); if (tues(ny) < asof) ny += 2;
+      const classUp = [2, 3, 1][(((ny - 2026) / 2) % 3 + 3) % 3];
+      const Y0 = ny - 14, Y1 = ny + 4, firstCong = 113 + (Y0 - 2012) / 2;
+      const rows = [["President", 4, ny - ((ny - 2012) % 4)], ["House, all seats", 2, ny], ["Senate class 1", 6, 2024], ["Senate class 2", 6, 2026], ["Senate class 3", 6, 2028]];
+      const W = 700, m = { l: 120, r: 10, t: 26 }, rh = 34, Ht = m.t + rows.length * rh + 30;
+      const x = scaleLinear().domain([Y0, Y1]).range([m.l, W - m.r]);
+      const s = svg("#c-cycle", W, Ht, "Election cycles for President, House and Senate classes");
+      for (let y = Y0; y <= Y1; y += 2) {
+        const nx = y === ny;
+        s.append("line").attr("x1", x(y + 0.84)).attr("x2", x(y + 0.84)).attr("y1", m.t - 6).attr("y2", Ht - 26).attr("stroke", nx ? css("--accent") : css("--rule")).attr("stroke-width", nx ? 2 : 1);
+        s.append("text").attr("class", nx ? "" : "t2").attr("x", x(y + 0.84)).attr("y", Ht - 10).attr("text-anchor", "middle").attr("font-size", 11.5).attr("font-weight", nx ? 600 : 400).text(y);
+        const c = firstCong + (y - Y0) / 2;
+        if (y < Y1 && c >= 113) s.append("text").attr("class", "t2").attr("x", x(y + 1.92)).attr("y", m.t - 10).attr("text-anchor", "middle").attr("font-size", 11).text(ord(c));
+      }
+      s.append("text").attr("class", "t2").attr("x", m.l - 10).attr("y", m.t - 10).attr("text-anchor", "end").attr("font-size", 11).text("Congress");
+      rows.forEach(([l, len, anchor], i) => {
+        const yy = m.t + i * rh;
+        s.append("text").attr("x", m.l - 10).attr("y", yy + 17).attr("text-anchor", "end").attr("font-size", 12.5).text(l);
+        let y = anchor; while (y > Y0 - len) y -= len;
+        for (; y < Y1; y += len) {
+          const a = Math.max(m.l, x(y + 0.84) + 2), b = Math.min(x(y + len + 0.84) - 2, W - m.r), up = y + len === ny;
+          if (b > a) s.append("rect").attr("x", a).attr("y", yy + 6).attr("width", b - a).attr("height", 16).attr("fill", up ? css("--accent-l") : css("--panel")).attr("stroke", up ? css("--accent") : "none");
+        }
+      });
+      if (M) {
+        const up = M.senate.filter((s) => s[2] === classUp), cn = (p) => up.filter((s) => s[0] === p).length;
+        const when = tues(ny) === asof ? ", today" : "";
+        const [yy, mm, dd] = tues(ny).split("-").map(Number);
+        document.getElementById("nextel").innerHTML = `<b>Next general election: November ${dd}, ${yy}${when}.</b> All 435 House seats and the ${up.length} Senate seats of class ${classUp} are on the ballot: ${["R", "D", "I"].filter(cn).map((p) => `${cn(p)} held by ${PN[p]}s`).join(", ")}${ny % 4 === 0 ? ", plus the presidency" : ""}. Special elections can add Senate seats.`;
+      }
+    }
+
+    // Exhibit 4: control by Congress
+    {
+      const rows = C.rows, W = 700, m = { l: 128, r: 70, t: 22 }, rh = 46, Ht = m.t + rows.length * rh + 10, mid = (W - m.r - m.l) / 2 + m.l;
+      const xs = [scaleLinear().domain([0, 1]).range([m.l, mid - 10]), scaleLinear().domain([0, 1]).range([mid + 10, W - m.r])];
+      const s = svg("#c-control", W, Ht, "Seats by party per Congress, and laws enacted");
+      [["House", xs[0](0)], ["Senate", xs[1](0)], ["Laws", W - m.r + 8]].forEach(([t, xx]) => s.append("text").attr("x", xx).attr("y", 12).attr("font-size", 12).attr("font-weight", 600).text(t));
+      rows.forEach((r, i) => {
+        const yy = m.t + i * rh, c = r.c;
+        s.append("text").attr("x", m.l - 10).attr("y", yy + 13).attr("text-anchor", "end").attr("font-size", 12.5).attr("font-weight", 600).text(`${ord(c)} · ${2013 + 2 * (c - 113)}–${String(2015 + 2 * (c - 113)).slice(2)}`);
+        s.append("text").attr("class", "t2").attr("x", m.l - 10).attr("y", yy + 28).attr("text-anchor", "end").attr("font-size", 11.5).text(`${r.pres || ""}${r.unified ? " · unified" : ""}`);
+        [["house", xs[0]], ["senate", xs[1]]].forEach(([ch, sc]) => {
+          const d = r.seats?.[ch]; if (!d) return;
+          const tot = sum(Object.values(d)); let acc = 0;
+          ["D", "I", "R", "O"].forEach((p) => { const v = d[p] || 0; if (!v) return;
+            s.append("rect").attr("x", sc(acc / tot) + (acc ? 1 : 0)).attr("y", yy + 2).attr("width", Math.max(0, sc((acc + v) / tot) - sc(acc / tot) - (acc ? 1 : 0))).attr("height", 18).attr("fill", css(PC[p]))
+              .on("mousemove", (e) => showTip(e, `${ord(c)} Congress, ${ch === "house" ? "House" : "Senate"} · ${PN[p]}s<br><b>${v}</b> of ${tot} seats`)).on("mouseleave", hideTip);
+            acc += v; });
+          s.append("line").attr("x1", sc(0.5)).attr("x2", sc(0.5)).attr("y1", yy - 2).attr("y2", yy + 24).attr("stroke", css("--ink"));
+          s.append("text").attr("class", "t2").attr("x", sc(0)).attr("y", yy + 34).attr("font-size", 11).text((d.D || 0) + (d.I || 0));
+          s.append("text").attr("class", "t2").attr("x", sc(1)).attr("y", yy + 34).attr("text-anchor", "end").attr("font-size", 11).text(d.R || 0);
+        });
+        s.append("text").attr("x", W - m.r + 8).attr("y", yy + 16).attr("font-size", 13).attr("font-weight", r.unified && r.done ? 600 : 400).text(fmt(r.laws) + (r.done ? "" : " so far"));
+      });
+    }
+
+    // Exhibit 5: unit grid, largest-remainder rounding
+    const FAR = [["intro", "Never left committee", "--grey-l"], ["comm", "Committee acted, no floor passage", "--grey"], ["one", "Passed one chamber", "--ink-2"], ["both", "Passed both, not law (vetoed or stalled)", "--ink"], ["law", "Became law", "--accent"]];
+    {
+      const per = 50, total = Math.round(A.intro / per), raw = FAR.map(([k]) => (P.far[k] || 0) / per), fl = raw.map(Math.floor);
+      let left = total - sum(fl);
+      raw.map((r, i) => [r - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (left > 0) { fl[i]++; left--; } });
+      FAR.forEach(([k], i) => { if ((P.far[k] || 0) > 0 && fl[i] === 0) { fl[i] = 1; fl[0]--; } });
+      const cells = FAR.flatMap((f, i) => Array(fl[i]).fill(f));
+      const el = document.getElementById("c-grid");
+      const draw = () => {
+        el.innerHTML = "";
+        const W = Math.max(300, el.clientWidth || 700), cols = W < 500 ? 40 : 64, sz = W / cols, rws = Math.ceil(cells.length / cols);
+        svg(el, W, rws * sz, `Grid of ${fmt(A.intro)} bills; ${fmt(A.law)} became law`).selectAll("rect").data(cells).join("rect")
+          .attr("x", (d, i) => (i % cols) * sz).attr("y", (d, i) => Math.floor(i / cols) * sz).attr("width", sz - 2).attr("height", sz - 2).attr("fill", (d) => css(d[2]))
+          .on("mousemove", (e, d) => showTip(e, `${d[1]}<br><b>${fmt(P.far[d[0]])}</b> bills · ${pct(P.far[d[0]] / A.intro)}`)).on("mouseleave", hideTip);
+      };
+      draw(); let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 150); });
+      document.getElementById("lg-grid").innerHTML = FAR.map(([k, l, c]) => `<span><i class="sq" style="background:var(${c})"></i>${l} <b class="num" style="color:var(--ink)">${fmt(P.far[k] || 0)}</b></span>`).join("");
+    }
+
+    // Exhibit 6: route map, two lanes on one linear scale
+    {
+      const ST = ["intro", "committee", "p1", "p2", "pres", "law"], W = 1000, colW = W / 6, bw = 14, bandMax = 150, gapY = 46, top = 22;
+      const O = P.by_origin, y = scaleLinear().domain([0, Math.max(O.House.intro, O.Senate.intro)]).range([0, bandMax]);
+      const lanes = [["House", "Starts in the House"], ["Senate", "Starts in the Senate"]], laneH = lanes.map(([k]) => y(O[k].intro));
+      const Ht = top + laneH[0] + gapY + laneH[1] + 64, s = svg("#c-route", W, Ht, "Route map: bills remaining at each stage, House and Senate bills");
+      let y0 = top;
+      lanes.forEach(([k, lab], li) => {
+        const vals = ST.map((st) => O[k][st]), xs = ST.map((_, i) => i * colW + 6), mid = y0 + laneH[li] / 2;
+        for (let i = 0; i < 5; i++) {
+          const h1 = y(vals[i]), h2 = y(vals[i + 1]), xa = xs[i] + bw, xb = xs[i + 1];
+          s.append("path").attr("d", `M${xa},${mid - h1 / 2}L${xb},${mid - h2 / 2}L${xb},${mid + h2 / 2}L${xa},${mid + h1 / 2}Z`).attr("fill", i === 4 ? css("--accent-l") : css("--panel"));
+        }
+        ST.forEach((st, i) => {
+          const h = Math.max(2, y(vals[i])), law = st === "law", big = i === 0 || law;
+          s.append("rect").attr("x", xs[i]).attr("y", mid - h / 2).attr("width", bw).attr("height", h).attr("fill", law ? css("--accent") : css("--ink"))
+            .on("mousemove", (e) => showTip(e, `${lab}<br><b>${fmt(vals[i])}</b> bills reached this stage · ${pct(vals[i] / vals[0])} of those introduced`)).on("mouseleave", hideTip);
+          s.append("text").attr("class", "halo").attr("x", xs[i] + bw + 6).attr("y", i === 0 ? mid + 2 : mid - h / 2 - 6).attr("font-size", big ? 15 : 13).attr("font-weight", big ? 600 : 400).attr("fill", law ? css("--accent") : css("--ink")).text(fmt(vals[i]));
+          if (i > 0) s.append("text").attr("class", "t2 halo").attr("x", xs[i] + bw + 6).attr("y", mid - h / 2 - 21).attr("font-size", 11.5).text(pct(vals[i] / vals[0]));
+        });
+        s.append("text").attr("class", "halo").attr("x", xs[0] + 22).attr("y", mid + 22).attr("font-size", 13).attr("font-weight", 600).text(lab);
+        y0 += laneH[li] + gapY;
+      });
+      const gy = Ht - 30;
+      s.append("line").attr("x1", 6).attr("x2", W - 6).attr("y1", gy - 16).attr("y2", gy - 16).attr("stroke", css("--rule"));
+      [["intro_comm", "introduced to reported"], ["comm_p1", "reported to passed"], ["p1_p2", "to the other chamber"], ["p2_pres", "to the President"], ["pres_law", "to signature"]].forEach(([k, lab], i) => {
+        const xx = i * colW + 6 + bw + (colW - bw) / 2, gg = P.gaps[k]; if (!gg) return;
+        s.append("text").attr("x", xx).attr("y", gy + 4).attr("text-anchor", "middle").attr("font-size", 15).attr("font-weight", 600).text(`${Math.round(gg.med)} days`);
+        s.append("text").attr("class", "t2").attr("x", xx).attr("y", gy + 20).attr("text-anchor", "middle").attr("font-size", 11.5).text(lab);
+      });
+    }
+
+    // Exhibit 7: share reaching the next stage
+    {
+      const rows = [["Introduced → committee acts", A.committee, A.intro], ["Committee acted → passes a chamber", A.p1 - P.p1_no_committee, A.committee],
+        ["Passed one chamber → passes both", A.p2, A.p1], ["Passed both → reaches President", A.pres, A.p2], ["Reached President → becomes law", A.law, A.pres]];
+      const W = 640, rh = 40, m = { t: 6, r: 50, l: 230 }, Hh = rows.length * rh + m.t + 20, x = scaleLinear().domain([0, 1]).range([m.l, W - m.r]);
+      const s = svg("#c-gates", W, Hh, "Share of bills at each stage that reached the next");
+      [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
+        s.append("line").attr("x1", x(t)).attr("x2", x(t)).attr("y1", m.t).attr("y2", Hh - 20).attr("stroke", css("--rule"));
+        s.append("text").attr("class", "t2").attr("x", x(t)).attr("y", Hh - 4).attr("text-anchor", "middle").attr("font-size", 11.5).text(pct(t, 0));
+      });
+      rows.forEach(([l, a, b], i) => {
+        const v = b ? a / b : 0, yy = m.t + i * rh + 8, hard = v < 0.5;
+        s.append("text").attr("x", m.l - 10).attr("y", yy + 15).attr("text-anchor", "end").attr("font-size", 13).text(l);
+        s.append("rect").attr("x", x(0)).attr("y", yy).attr("width", x(1) - x(0)).attr("height", 22).attr("fill", css("--panel"));
+        s.append("rect").attr("x", x(0)).attr("y", yy).attr("width", x(v) - x(0)).attr("height", 22).attr("fill", hard ? css("--accent") : css("--grey-l"))
+          .on("mousemove", (e) => showTip(e, `${l}<br><b>${pct(v)}</b> · ${fmt(a)} of ${fmt(b)} bills`)).on("mouseleave", hideTip);
+        s.append("text").attr("x", x(v) + 6).attr("y", yy + 16).attr("font-size", 13).attr("font-weight", hard ? 600 : 400).text(pct(v, 0));
+      });
+    }
+
+    // Exhibit 8: the clock
+    {
+      const L = [["Introduction to first chamber passage", "intro_p1"], ["First chamber to second chamber", "p1_p2"], ["Second passage to presented", "p2_pres"], ["Presented to signed", "pres_law"], ["Total, introduction to law", "intro_law"]];
+      const W = 640, rh = 44, m = { t: 6, r: 30, l: 230, b: 26 }, Hh = L.length * rh + m.t + m.b, XM = 450, x = scaleLinear().domain([0, XM]).range([m.l, W - m.r]);
+      const s = svg("#c-clock", W, Hh, "Days spent on each leg of the route");
+      x.ticks(5).forEach((t) => {
+        s.append("line").attr("x1", x(t)).attr("x2", x(t)).attr("y1", m.t).attr("y2", Hh - m.b).attr("stroke", css("--rule"));
+        s.append("text").attr("class", "t2").attr("x", x(t)).attr("y", Hh - 8).attr("text-anchor", "middle").attr("font-size", 11.5).text(t === 0 ? "0 days" : t);
+      });
+      L.forEach(([l, k], i) => {
+        const g = P.gaps[k]; if (!g) return;
+        const yy = m.t + i * rh + rh / 2, tot = k === "intro_law", col = tot ? css("--accent") : css("--ink");
+        if (tot) s.append("line").attr("x1", 0).attr("x2", W).attr("y1", yy - rh / 2).attr("y2", yy - rh / 2).attr("stroke", css("--ink"));
+        s.append("text").attr("x", m.l - 10).attr("y", yy + 4).attr("text-anchor", "end").attr("font-size", 13).attr("font-weight", tot ? 600 : 400).text(l);
+        s.append("line").attr("x1", x(g.p25)).attr("x2", x(Math.min(g.p75, XM))).attr("y1", yy).attr("y2", yy).attr("stroke", col).attr("stroke-width", 6).attr("stroke-opacity", 0.3);
+        s.append("circle").attr("cx", x(Math.min(g.med, XM))).attr("cy", yy).attr("r", 6).attr("fill", col).attr("stroke", css("--paper")).attr("stroke-width", 2)
+          .on("mousemove", (e) => showTip(e, `${l}<br>Median <b>${Math.round(g.med)}</b> days · middle half ${g.p25}–${g.p75}`)).on("mouseleave", hideTip);
+        s.append("text").attr("x", x(Math.min(g.p75, XM)) + 8).attr("y", yy + 4).attr("font-size", 13).attr("font-weight", 600).text(Math.round(g.med));
+      });
+    }
+
+    // Exhibit 9: every law as a line, plus laws per month (H6: hover names the bill, click opens it)
+    {
+      const W = 700, m = { l: 34, r: 12, t: 8 }, LH = 300, BH = 110, gap = 34, Ht = m.t + LH + gap + BH + 40, Ls = P.lines, n = Ls.length;
+      const x = scaleLinear().domain([0, 745]).range([m.l, W - m.r]), y = scaleLinear().domain([0, n]).range([m.t, m.t + LH]);
+      const s = svg("#c-lines", W, Ht, "Every law from introduction to enactment on a two-year calendar");
+      [[0, 1], [365, 0], [669, 2], [730, 0]].forEach(([d, k]) => s.append("line").attr("x1", x(d)).attr("x2", x(d)).attr("y1", m.t).attr("y2", m.t + LH + gap + BH).attr("stroke", k === 1 ? css("--ink") : css("--rule")).attr("stroke-dasharray", k === 2 ? "3 3" : null));
+      const g = s.append("g");
+      Ls.forEach((r, i) => g.append("line").attr("x1", x(r[1])).attr("x2", x(Math.min(745, r[2]))).attr("y1", y(i)).attr("y2", y(i)).attr("stroke", css("--grey-l")).attr("stroke-width", 0.6));
+      g.append("path").attr("d", d3line()(Ls.map((r, i) => [x(Math.min(745, r[2])), y(i)]))).attr("fill", "none").attr("stroke", css("--accent")).attr("stroke-width", 2);
+      s.append("text").attr("class", "t2 halo").attr("x", m.l + 6).attr("y", m.t + LH - 6).attr("font-size", 11.5).text("Grey line: introduced → enacted");
+      s.append("text").attr("class", "halo").attr("x", x(560)).attr("y", y(n * 0.55)).attr("text-anchor", "end").attr("font-size", 12).attr("fill", css("--accent")).text("Enactment date →");
+      const at = (e) => { const [, py] = pointer(e); return Ls[Math.max(0, Math.min(n - 1, Math.round(y.invert(py))))]; };
+      s.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", LH).attr("fill", "transparent").style("cursor", "pointer")
+        .on("mousemove", (e) => { const r = at(e); showTip(e, `<b>${billLabel(r[0])}</b> · ${ord(+r[0].split("-")[0])} Congress<br>Introduced day ${r[1]}, law day ${r[2]} · ${r[2] - r[1]} days`); })
+        .on("mouseleave", hideTip).on("click", (e) => { const [c, t, nn] = at(e)[0].split("-"); location.href = `${base}bills/${c}/${t}/${nn}/`; });
+      const by = m.t + LH + gap, mo = P.law_month, yb = scaleLinear().domain([0, max(mo)]).range([by + BH, by]), mx = (i) => x(Math.min(745, i * 30.44)), peak = mo.indexOf(max(mo));
+      s.append("text").attr("class", "t2").attr("x", m.l).attr("y", by - 10).attr("font-size", 11.5).text("Laws enacted per month of the term");
+      mo.forEach((v, i) => s.append("rect").attr("x", mx(i) + 1).attr("y", yb(v)).attr("width", Math.max(1, mx(i + 1) - mx(i) - 2)).attr("height", by + BH - yb(v)).attr("fill", i === peak ? css("--accent") : css("--grey-l"))
+        .on("mousemove", (e) => showTip(e, `Month ${i + 1} of the term<br><b>${fmt(v)}</b> laws`)).on("mouseleave", hideTip));
+      s.append("text").attr("class", "halo").attr("x", mx(peak) - 4).attr("y", yb(mo[peak]) + 12).attr("text-anchor", "end").attr("font-size", 12).attr("font-weight", 600).text(`${fmt(mo[peak])} ${peak === 23 ? "in the final December" : `in month ${peak + 1}`}`);
+      s.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", by + BH).attr("y2", by + BH).attr("stroke", css("--ink"));
+      [[0, "Year 1"], [365, "Year 2"], [669, "Election"], [730, "End"]].forEach(([d, l]) => s.append("text").attr("class", "t2").attr("x", x(d) + 3).attr("y", by + BH + 16).attr("font-size", 11.5).text(l));
+    }
+
+    // Exhibits 11–12: by Congress (current Congress outlined)
+    {
+      const B = P.by_congress, cs = Object.keys(B).map(Number);
+      const bar = (el, val, fv, label, col) => {
+        const W = 460, Hh = 230, m = { t: 22, r: 10, b: 30, l: 10 };
+        const x = scaleBand().domain(cs).range([m.l, W - m.r]).padding(0.28), yv = scaleLinear().domain([0, max(cs, val) * 1.12]).range([Hh - m.b, m.t]);
+        const s = svg(el, W, Hh, label);
+        cs.forEach((c) => {
+          const cur = c > last, v = val(c);
+          s.append("rect").attr("x", x(c)).attr("y", yv(v)).attr("width", x.bandwidth()).attr("height", yv(0) - yv(v)).attr("fill", cur ? css("--paper") : col).attr("stroke", cur ? col : "none").attr("stroke-width", 1.5).attr("stroke-dasharray", cur ? "3 2" : null)
+            .on("mousemove", (e) => showTip(e, `${ord(c)} Congress${cur ? " (in session)" : ""}<br><b>${fv(v)}</b>`)).on("mouseleave", hideTip);
+          s.append("text").attr("x", x(c) + x.bandwidth() / 2).attr("y", yv(v) - 6).attr("text-anchor", "middle").attr("font-size", 12).text(fv(v));
+          s.append("text").attr("class", "t2").attr("x", x(c) + x.bandwidth() / 2).attr("y", Hh - 10).attr("text-anchor", "middle").attr("font-size", 12).text(ord(c) + (cur ? "*" : ""));
+        });
+        s.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", yv(0)).attr("y2", yv(0)).attr("stroke", css("--ink"));
+      };
+      bar("#c-intro", (c) => B[c].intro, fmt, "Bills introduced per Congress", css("--grey-l"));
+      bar("#c-rate", (c) => B[c].law / B[c].intro, (v) => pct(v), "Share of bills that became law per Congress", css("--accent"));
+    }
+
+    // Exhibit 13: policy areas
+    {
+      const Pl = P.policy, W = 640, rh = 26, m = { l: 250, r: 60, t: 4 }, Hh = Pl.length * rh + m.t + 4, x = scaleLinear().domain([0, Pl[0]?.[1] || 1]).range([m.l, W - m.r]);
+      const s = svg("#c-policy", W, Hh, "Laws by policy area");
+      Pl.forEach(([a, v], i) => {
+        const yy = m.t + i * rh;
+        s.append("text").attr("x", m.l - 10).attr("y", yy + 15).attr("text-anchor", "end").attr("font-size", 13).text(a);
+        s.append("rect").attr("x", m.l).attr("y", yy + 4).attr("width", x(v) - m.l).attr("height", 16).attr("fill", i === 0 ? css("--accent") : css("--grey-l"))
+          .on("mousemove", (e) => showTip(e, `${a}<br><b>${fmt(v)}</b> laws · ${pct(v / A.law)}`)).on("mouseleave", hideTip);
+        s.append("text").attr("x", x(v) + 6).attr("y", yy + 16).attr("font-size", 12.5).attr("font-weight", i === 0 ? 600 : 400).text(fmt(v));
+      });
+    }
+  </script>
+</Site>

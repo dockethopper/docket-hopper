@@ -4,6 +4,7 @@
 
 Writes:
     site/src/data/site.json            numbers, claims and lists for the landing, coverage, outcomes, about pages
+    site/src/data/how.json             the How Congress works page (stages, timing, seats by party)
     site/src/data/pre/{c}.json         full detail for bills that get a pre-rendered page (current Congress, laws, vetoes)
     site/public/data/dir/{c}.json      one Congress of directory rows (D5)
     site/public/data/search.json       compact cross-Congress title index
@@ -27,7 +28,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import claims, model as M, network as N
+from . import claims, howitworks, model as M, network as N
 from .status import _PASS_RE, _RECEIVED_RE, _REPORTED_RE, _chamber
 
 log = logging.getLogger("ingest.export")
@@ -461,6 +462,8 @@ def run(conn, out: Path, today: str | None = None, workers: int | None = None) -
         "prerendered": len(pre_ids),
     }
     _wjson(src / "site.json", site, pretty=True)
+    # How Congress works page: its own file, since it carries a line per enacted law.
+    _wjson(src / "how.json", howitworks.build(conn, cur, today, PRES, congresses))
     # Small public file the site-health workflow reads to tell whether the live site is current.
     _wjson(out / "public" / "data" / "status.json", {"built": today, "data_date": data_date, "bills": totals["bills"], "laws": totals["laws"]})
     log.info("export done: %d pre-rendered bills, %d bill files, %d maps", len(pre_ids), totals["bills"] - len(pre_ids), len(hoods))
