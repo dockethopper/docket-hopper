@@ -145,7 +145,8 @@ def parse(xml_bytes: bytes) -> dict[str, Any]:
     if summaries is not None:
         summary_items = summaries.findall("summary") or _items(summaries, "billSummaries")
     summary_items.sort(key=lambda s: _text(s, "updateDate", "lastSummaryUpdateDate") or "")
-    summary = strip_html(_text(summary_items[-1], "text")) if summary_items else None
+    # The real XML wraps the text as <cdata><text>; older/synthetic files use <text>.
+    summary = strip_html(_text(summary_items[-1], "text", "cdata/text")) if summary_items else None
 
     text_versions = []
     for it in _items(bill, "textVersions"):

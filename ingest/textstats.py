@@ -7,6 +7,7 @@ bills can optionally keep their full text under data/text/ for the summarizer.
 from __future__ import annotations
 
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -14,6 +15,15 @@ from .govinfo import _get
 from .parse_billstatus import strip_html
 
 log = logging.getLogger("ingest.textstats")
+
+# govinfo bill XML carries metadata (Dublin Core, action history) around the body;
+# count only the legislative text itself.
+_BODY_RE = re.compile(r"<(legis-body|resolution-body|engrossed-amendment-body)\b[\s\S]*?</\1>")
+
+
+def bill_text(raw: str) -> str:
+    bodies = [m.group(0) for m in _BODY_RE.finditer(raw)]
+    return strip_html(" ".join(bodies) if bodies else raw) or ""
 
 
 def run(conn, limit: int | None = None, workers: int = 8, keep_text_dir: Path | None = None) -> int:
@@ -23,7 +33,7 @@ def run(conn, limit: int | None = None, workers: int = 8, keep_text_dir: Path | 
 
     def work(row):
         try:
-            text = strip_html(_get(row["latest_text_url"]).decode("utf-8", "replace")) or ""
+            text = bill_text(_get(row["latest_text_url"]).decode("utf-8", "replace"))
             return row, text, None
         except Exception as e:
             return row, None, e
