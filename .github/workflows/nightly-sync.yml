@@ -27,6 +27,10 @@ jobs:
           mkdir -p data
           gh release download data --pattern 'billboard.sqlite.gz' --dir data || echo "no release yet"
           [ -f data/billboard.sqlite.gz ] && gunzip -f data/billboard.sqlite.gz || true
+      - name: Backfill history if there is no database yet
+        # First run only: the full 113th-to-now bulk pull takes about 5 minutes.
+        run: |
+          [ -f data/billboard.sqlite ] || python -m ingest bulk
       - name: Sync changed bills (current Congress)
         run: python -m ingest sync
       - name: Word counts for new text
