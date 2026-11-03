@@ -32,3 +32,11 @@ test("cosponsor clause branches", () => {
 test("long or boilerplate titles fall back to the bill number", () => {
   assert.equal(shortName({ id: "119-hr-1", title: "An act to provide for reconciliation pursuant to title II of H. Con. Res. 14." }), "H.R. 1");
 });
+
+test("glossary links in action text (H9)", async () => {
+  const { glossify } = await import("../src/lib/ui.js");
+  assert.equal(glossify("Pocket Vetoed by President.", "/x/"), '<a href="/x/how-it-works/#g-pocket-veto">Pocket Vetoed</a> by President.');
+  assert.equal(glossify("Passed Senate without amendment by Unanimous Consent.", "/"), 'Passed Senate without amendment by <a href="/how-it-works/#g-unanimous-consent">Unanimous Consent</a>.');
+  assert.equal(glossify("Reported by the Committee. Reported again.", "/").match(/<a /g).length, 1);
+  assert.equal(glossify("Introduced in House", "/"), "Introduced in House");
+});

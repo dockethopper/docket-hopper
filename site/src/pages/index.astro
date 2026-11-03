@@ -24,6 +24,7 @@ const chart = { same: site.congresses.map((c) => ({ k: c, v: SP[c] })), cur, day
     <div class="eyebrow">{ord(cur)} Congress · day {site.day} of 730</div>
     <h1 class="cover-t">Every bill in Congress since 2013, read from the public record</h1>
     <p class="cover-s">{fmt(site.totals.bills)} bills and resolutions, with nonpartisan CRS summaries, the links between them, and what became of them. Updated every night.</p>
+    <p class="cover-s" style="margin-top:8px"><a href={`${base}how-it-works/`}>New to Congress? How it works, and the path a bill takes</a></p>
     <form class="bigsearch" action={`${base}search/`} method="get" role="search">
       <input id="dh-big" type="search" name="q" placeholder="Search by title, bill number or sponsor" aria-label="Search bills"><kbd>/</kbd>
     </form>

@@ -86,6 +86,7 @@ const years = (k) => `${2013 + 2 * (k - 113)}–${2015 + 2 * (k - 113)}`;
       $("dir-unit").textContent = `sortable; ${fmt(rows.filter((r) => !r.res).length)} bills and joint resolutions, ${fmt(rows.filter((r) => r.res).length)} resolutions`;
       const p = new URLSearchParams(location.search);
       if (p.get("q")) { f.q = p.get("q"); $("f-q").value = f.q; }
+      if (/^([0-4]|veto)$/.test(p.get("stage") || "")) { f.stage = p.get("stage"); $("f-stage").value = f.stage; }
       render();
     }).catch(() => { $("dir-body").innerHTML = `<tr><td colspan="8">Could not load the bill list. Try reloading the page.</td></tr>`; });
     document.querySelectorAll("table.dir th button").forEach((b) => b.addEventListener("click", () => {

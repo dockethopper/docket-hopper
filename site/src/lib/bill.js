@@ -1,6 +1,6 @@
 // One bill page, as an HTML string. Used at build time for pre-rendered bills and in the
 // browser for every other bill, so both look identical.
-import { esc, fmt, pct, ord, billLabel, billPath, mapPath, fdate, daysBetween, STAGES, stageName, isLaw, isVeto, party, track, LEG } from "./ui.js";
+import { esc, fmt, pct, ord, billLabel, billPath, mapPath, fdate, daysBetween, STAGES, stageName, isLaw, isVeto, party, track, LEG, glossify } from "./ui.js";
 
 const CG_TYPE = { hr: "house-bill", s: "senate-bill", hjres: "house-joint-resolution", sjres: "senate-joint-resolution", hres: "house-resolution", sres: "senate-resolution", hconres: "house-concurrent-resolution", sconres: "senate-concurrent-resolution" };
 export const congressGovUrl = (d) => `https://www.congress.gov/bill/${ord(d.c)}-congress/${CG_TYPE[d.t] || d.t}/${d.n}`;
@@ -122,7 +122,7 @@ export function billHTML(d, base) {
       ${rec ? `<dt>Sponsor</dt><dd>${fmt(rec[1])} of ${fmt(rec[0])} bills enacted since 2013</dd>` : ""}
       ${d.versions?.length ? `<dt>Text versions</dt><dd>${d.versions.length}${d.versions.length > 1 ? `, from ${esc(d.versions[0][0].toLowerCase())} to ${esc(d.versions.at(-1)[0].toLowerCase())}` : `: ${esc(d.versions[0][0].toLowerCase())}`}${d.words ? ` · ${fmt(d.words)} words` : ""}</dd>` : ""}
       ${d.subjects?.length ? `<dt>Subjects</dt><dd>${d.subjects.slice(0, 6).map((s) => `<span class="chip" style="margin:0 4px 4px 0">${esc(s)}</span>`).join("")} ${d.n_subjects > 6 ? `<span class="muted">+${d.n_subjects - 6} more</span>` : ""}</dd>` : ""}
-      <dt>Latest action</dt><dd>${fdate(d.latest?.[0])}: ${esc(d.latest?.[1] || "")}</dd>
+      <dt>Latest action</dt><dd>${fdate(d.latest?.[0])}: ${glossify(esc(d.latest?.[1] || ""), base)}</dd>
       <dt>Records</dt><dd><a href="${congressGovUrl(d)}">Congress.gov</a>${d.text_url ? ` · <a href="${esc(d.text_url)}">Bill text</a>` : ""}</dd>
      </dl></div>
      <div><div class="exh-h"><span class="n">Exhibit 1</span><b>Passage odds band at each stage,</b> <span class="u">rated when the bill reached it [4]</span></div>
