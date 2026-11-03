@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SYNTHETIC test fixture in the pre-2022 BILLSTATUS layout. Not real bill data. -->
+<billStatus>
+  <bill>
+    <billNumber>4242</billNumber>
+    <billType>HR</billType>
+    <congress>114</congress>
+    <introducedDate>2015-03-02</introducedDate>
+    <updateDate>2016-01-01T00:00:00Z</updateDate>
+    <originChamber>House</originChamber>
+    <policyArea><name>Transportation and Public Works</name></policyArea>
+    <subjects><billSubjects><legislativeSubjects><item><name>Highways</name></item></legislativeSubjects></billSubjects></subjects>
+    <committees><billCommittees><item><systemCode>hspw00</systemCode><name>Transportation and Infrastructure Committee</name><chamber>House</chamber></item></billCommittees></committees>
+    <sponsors><item><bioguideId>X000009</bioguideId><fullName>Rep. Nine</fullName><party>D</party><state>XX</state></item></sponsors>
+    <cosponsors/>
+    <summaries><billSummaries><item><lastSummaryUpdateDate>2015-04-01T00:00:00Z</lastSummaryUpdateDate><text>&lt;p&gt;Funds roads.&lt;/p&gt;</text></item></billSummaries></summaries>
+    <actions>
+      <item><actionDate>2015-03-02</actionDate><text>Introduced in House</text><type>IntroReferral</type></item>
+      <item><actionDate>2015-12-04</actionDate><text>Became Public Law No: 114-999.</text><type>BecameLaw</type></item>
+    </actions>
+    <laws><item><type>Public Law</type><number>114-999</number></item></laws>
+    <relatedBills/>
+    <title>Example Roads Act</title>
+  </bill>
+</billStatus>

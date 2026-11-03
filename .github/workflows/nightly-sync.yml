@@ -1,0 +1,42 @@
+# Nightly: pull the database from the latest "data" release, refetch bills that
+# changed on govinfo, add word counts for new text, and publish the database back.
+# The site build (added in Stage 2) will run after this job.
+name: nightly-sync
+
+on:
+  schedule:
+    - cron: "17 7 * * *"   # 07:17 UTC daily, after govinfo's overnight refresh
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download current database
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          gh release download data --pattern 'billboard.sqlite.gz' --dir data || echo "no release yet"
+          [ -f data/billboard.sqlite.gz ] && gunzip -f data/billboard.sqlite.gz || true
+      - name: Sync changed bills (current Congress)
+        run: python -m ingest sync
+      - name: Word counts for new text
+        run: python -m ingest textstats --limit 3000
+      - name: Summary
+        run: python -m ingest stats
+      - name: Publish database
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gzip -kf data/billboard.sqlite
+          gh release view data >/dev/null 2>&1 || gh release create data --title "Bill database" --notes "Rolling SQLite snapshot, updated nightly."
+          gh release upload data data/billboard.sqlite.gz --clobber

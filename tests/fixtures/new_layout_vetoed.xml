@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SYNTHETIC test fixture in the post-2022 BILLSTATUS layout. Not real bill data. -->
+<billStatus>
+  <bill>
+    <number>9001</number>
+    <updateDate>2024-05-01T12:00:00Z</updateDate>
+    <originChamber>House</originChamber>
+    <type>HJRES</type>
+    <introducedDate>2024-01-10</introducedDate>
+    <congress>118</congress>
+    <committees>
+      <item><systemCode>hsii00</systemCode><name>Natural Resources Committee</name><chamber>House</chamber></item>
+    </committees>
+    <relatedBills>
+      <item><title>Companion</title><congress>118</congress><number>77</number><type>SJRES</type>
+        <relationshipDetails><item><identifiedBy>CRS</identifiedBy><type>Identical bill</type></item></relationshipDetails>
+      </item>
+    </relatedBills>
+    <actions>
+      <item><actionDate>2024-04-20</actionDate><text>Vetoed by President.</text><type>Veto</type><actionCode>E30000</actionCode><sourceSystem><name>Library of Congress</name></sourceSystem></item>
+      <item><actionDate>2024-01-10</actionDate><text>Referred to the House Committee on Natural Resources.</text><type>IntroReferral</type><sourceSystem><name>House floor actions</name></sourceSystem></item>
+      <item><actionDate>2024-02-01</actionDate><text>Passed/agreed to in House: On passage Passed by the Yeas and Nays: 220 - 210.</text><type>Floor</type><sourceSystem><name>Library of Congress</name></sourceSystem></item>
+      <item><actionDate>2024-03-01</actionDate><text>Passed/agreed to in Senate: Passed Senate without amendment by Yea-Nay Vote. 51 - 49.</text><type>Floor</type><sourceSystem><name>Library of Congress</name></sourceSystem></item>
+      <item><actionDate>2024-04-10</actionDate><text>Presented to President.</text><type>President</type><sourceSystem><name>Library of Congress</name></sourceSystem></item>
+    </actions>
+    <sponsors>
+      <item><bioguideId>X000001</bioguideId><fullName>Rep. Example, Pat [R-ZZ-1]</fullName><party>R</party><state>ZZ</state></item>
+    </sponsors>
+    <cosponsors>
+      <item><bioguideId>X000002</bioguideId><fullName>Rep. Two</fullName><party>R</party><state>ZZ</state><sponsorshipDate>2024-01-10</sponsorshipDate><isOriginalCosponsor>True</isOriginalCosponsor></item>
+      <item><bioguideId>X000003</bioguideId><fullName>Rep. Three</fullName><party>D</party><state>YY</state><sponsorshipDate>2024-01-12</sponsorshipDate><isOriginalCosponsor>False</isOriginalCosponsor><sponsorshipWithdrawnDate>2024-01-20</sponsorshipWithdrawnDate></item>
+    </cosponsors>
+    <policyArea><name>Public Lands and Natural Resources</name></policyArea>
+    <subjects><legislativeSubjects><item><name>Mining</name></item><item><name>Federal lands</name></item></legislativeSubjects></subjects>
+    <summaries>
+      <summary><versionCode>00</versionCode><actionDate>2024-01-10</actionDate><actionDesc>Introduced in House</actionDesc><updateDate>2024-01-15T00:00:00Z</updateDate><text>&lt;p&gt;Old summary.&lt;/p&gt;</text></summary>
+      <summary><versionCode>81</versionCode><actionDate>2024-03-01</actionDate><actionDesc>Passed Senate</actionDesc><updateDate>2024-03-05T00:00:00Z</updateDate><text>&lt;p&gt;This joint resolution &lt;b&gt;nullifies&lt;/b&gt; a rule.&lt;/p&gt;</text></summary>
+    </summaries>
+    <title>Providing for disapproval of an example rule.</title>
+    <titles><item><titleType>Short Titles as Introduced</titleType><title>Example Rule Disapproval Act</title></item></titles>
+    <textVersions>
+      <item><type>Introduced in House</type><date>2024-01-10T05:00:00Z</date><formats><item><url>https://www.govinfo.gov/content/pkg/BILLS-118hjres9001ih/xml/BILLS-118hjres9001ih.xml</url></item><item><url>https://www.govinfo.gov/content/pkg/BILLS-118hjres9001ih/html/BILLS-118hjres9001ih.htm</url></item></formats></item>
+      <item><type>Enrolled Bill</type><date>2024-04-05T04:00:00Z</date><formats><item><url>https://www.govinfo.gov/content/pkg/BILLS-118hjres9001enr/xml/BILLS-118hjres9001enr.xml</url></item><item><url>https://www.govinfo.gov/content/pkg/BILLS-118hjres9001enr/html/BILLS-118hjres9001enr.htm</url></item></formats></item>
+    </textVersions>
+    <latestAction><actionDate>2024-04-20</actionDate><text>Vetoed by President.</text></latestAction>
+  </bill>
+</billStatus>
