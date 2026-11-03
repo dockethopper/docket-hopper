@@ -53,3 +53,12 @@ def test_upsert_is_idempotent(tmp_path):
     assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 1
     assert conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0] == 5
     assert conn.execute("SELECT word_count FROM bills").fetchone()[0] == 123  # preserved, same text
+
+
+def test_real_govinfo_file():
+    # Unmodified govinfo file: summary text sits under <cdata><text>.
+    p = parse((FIX / "real_118sjres7.xml").read_bytes())
+    b = p["bill"]
+    assert b["bill_id"] == "118-sjres-7"
+    assert b["summary"].startswith("This joint resolution nullifies the rule titled Revised Definition")
+    assert b["latest_text_url"].endswith("BILLS-118sjres7is.xml")
