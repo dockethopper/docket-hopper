@@ -1,0 +1,24 @@
+---
+import Site from "../../layouts/Site.astro";
+const repo = "https://github.com/dockethopper/docket-hopper";
+---
+<Site title="Terms and corrections · Docket Hopper" section="about" sectionText="Notes · Terms and corrections" page={10}
+  description="What Docket Hopper is and isn't, how to use its data, and how to report an error.">
+  <div><h1 class="claim" style="max-width:40ch">Docket Hopper reads the public record; Congress.gov remains the official source</h1>
+    <p class="sub">Last updated November 4, 2026.</p></div>
+  <div class="prose">
+    <h2>What this site is</h2>
+    <p>An independent project that organizes public data about bills in Congress. It is not affiliated with Congress, the Library of Congress, the Congressional Research Service, the Government Publishing Office or the GDELT Project, and nothing here is legal, financial or political advice.</p>
+    <h2>Accuracy</h2>
+    <ul>
+      <li>Data updates once a night and can lag <a href="https://www.congress.gov/">Congress.gov</a> by a day or more. Check Congress.gov before relying on a bill's status.</li>
+      <li>Passage odds are statistical estimates from past Congresses, shown as broad bands. They are not predictions about any one bill and should not be used for betting or trading.</li>
+      <li>News coverage counts are approximate. Search can miss articles or count unrelated ones; see <a href={`${import.meta.env.BASE_URL}about/`}>About the data</a> for how they are made.</li>
+    </ul>
+    <p>The site and its data are provided as is, without any warranty.</p>
+    <h2>Reusing the data</h2>
+    <p>Bill status records and CRS summaries are works of the U.S. government and are in the public domain. The nightly database is published with the <a href={repo}>site's code</a>; please credit Docket Hopper and the original sources if you use it. News coverage data comes from the GDELT Project and follows its terms.</p>
+    <h2>Corrections</h2>
+    <p>Found an error? <a href={`${repo}/issues/new?title=Correction:%20&labels=correction`}>Open an issue on GitHub</a> with the bill number and what looks wrong. Issues are public. Most errors come from the source data, so we'll check the record on Congress.gov and fix our copy or our code.</p>
+  </div>
+</Site>

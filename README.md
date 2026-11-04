@@ -64,3 +64,13 @@ site works at `dockethopper.github.io/docket-hopper/` now and at `dockethopper.c
   labelled `alert`. Watching the repo gets you the email.
 - **Pull requests.** `checks.yml` runs the Python and site tests plus a sample build (`DH_SAMPLE=50`)
   against the published database. Dependabot opens grouped update PRs monthly.
+
+### Public-site extras
+
+- `site/src/pages/privacy/` and `site/src/pages/terms/`: privacy notice and terms/corrections. Corrections go
+  through GitHub issues; there is no contact email yet.
+- Visit counts: GoatCounter (cookie-free), only in production builds. Set `DH_GOATCOUNTER=""` to turn it off
+  or point it at another counter.
+- `@astrojs/sitemap` writes `sitemap-index.xml` for every pre-rendered page; `robots.txt` points to it.
+  Older bills render in the browser from the 404 fallback, so they are not in the sitemap.
+- `site/public/og.png` is the link-preview image (1200×630) for every page.
