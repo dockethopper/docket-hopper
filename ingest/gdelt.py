@@ -130,29 +130,28 @@ def run(conn, congress: int, max_calls: int = 150, spacing: float = 20.0, minute
     deadline = time.monotonic() + minutes * 60
     stats = {"calls": 0, "bills": 0, "skipped": 0, "throttled": 0, "errors": 0}
     last_call = 0.0
-    strikes = 0
 
     def call(params):
-        nonlocal last_call, strikes
+        nonlocal last_call
         wait = spacing - (time.monotonic() - last_call)
         if wait > 0:
             time.sleep(wait)
-        last_call = time.monotonic()
-        stats["calls"] += 1
-        try:
-            out = _call(params)
-            strikes = 0
-            return out
-        except Throttled:
-            stats["throttled"] += 1
-            strikes += 1
-            if strikes >= 2:
-                raise
-            log.warning("GDELT 429; backing off 3 minutes")
-            time.sleep(180)
+        strikes = 0
+        while True:
             last_call = time.monotonic()
             stats["calls"] += 1
-            return _call(params)
+            try:
+                return _call(params)
+            except Throttled:
+                # GitHub's runners share addresses, so GDELT often throttles us before our first call.
+                # Back off 3, 6, 12... minutes while the time budget allows, instead of quitting.
+                stats["throttled"] += 1
+                strikes += 1
+                pause = 180 * 2 ** (strikes - 1)
+                if time.monotonic() + pause > deadline:
+                    raise
+                log.warning("GDELT 429; backing off %d minutes", pause // 60)
+                time.sleep(pause)
 
     for row in pick_bills(conn, congress, max_calls):
         if stats["calls"] >= max_calls or time.monotonic() > deadline:

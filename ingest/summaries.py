@@ -33,7 +33,7 @@ from .db import now
 log = logging.getLogger("ingest.summaries")
 
 MODEL = "claude-opus-5-5"
-MAX_TOKENS = 2000
+MAX_TOKENS = 8000      # Opus 5.5 always thinks first; thinking counts toward this cap
 KEEP_DAYS = 7          # how long a stale summary may stay up when tonight's fails
 LEG = ("hr", "s", "hjres", "sjres")
 LABEL = {"hr": "H.R.", "s": "S.", "hjres": "H.J.Res.", "sjres": "S.J.Res.", "hres": "H.Res.", "sres": "S.Res.",
@@ -223,6 +223,14 @@ def links(text: str, inp: dict, congress: int) -> dict:
 
 
 # ---------------------------------------------------------------- generation
+class Stopped(RuntimeError):
+    """The model stopped before finishing (for example at max_tokens); carries the tokens billed."""
+
+    def __init__(self, msg: str, tin: int = 0, tout: int = 0):
+        super().__init__(msg)
+        self.tin, self.tout = tin, tout
+
+
 def _call(section: str, inp: dict) -> tuple[str, int, int]:
     import anthropic  # only needed when a key is present
 
@@ -232,7 +240,7 @@ def _call(section: str, inp: dict) -> tuple[str, int, int]:
         messages=[{"role": "user", "content": PROMPTS[section] + "\n\n" + json.dumps(inp, ensure_ascii=False, indent=1)}],
     )
     if resp.stop_reason != "end_turn":
-        raise RuntimeError(f"stopped early: {resp.stop_reason}")
+        raise Stopped(f"stopped early: {resp.stop_reason}", resp.usage.input_tokens, resp.usage.output_tokens)
     text = "".join(b.text for b in resp.content if b.type == "text").strip()
     return text, resp.usage.input_tokens, resp.usage.output_tokens
 
@@ -260,8 +268,9 @@ def run(conn, site_dir: Path, live: bool | None = None, call=_call) -> dict:
             try:
                 text, tin, tout = call(section, inp)
                 problems = check(text, inp)
-            except Exception as e:  # API down, refusal, bad key: keep the last good one
-                text, tin, tout, problems = "", 0, 0, [f"call failed: {type(e).__name__}: {e}"[:300]]
+            except Exception as e:  # API down, refusal, bad key, cut off: keep the last good one
+                text, problems = "", [f"call failed: {type(e).__name__}: {e}"[:300]]
+                tin, tout = getattr(e, "tin", 0), getattr(e, "tout", 0)
             status = "ok" if not problems else "rejected"
             conn.execute("INSERT INTO ai_summary_log VALUES (?,?,?,?,?,?,?,?,?)",
                          (section, now(), h, MODEL, status, json.dumps(problems), text, tin, tout))
