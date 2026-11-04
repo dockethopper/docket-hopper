@@ -46,6 +46,8 @@ jobs:
           gunzip -f data/billboard.sqlite.gz
       - name: Export site data (checks every generated sentence against its numbers)
         run: python -m ingest export --out site
+      - name: Home-page summaries from the database (no API key here, so no new ones are written)
+        run: python -m ingest summaries --site site
       - name: Sample site build (every 50th bill page)
         working-directory: site
         env:

@@ -70,6 +70,13 @@ jobs:
         run: python -m ingest gdelt --max-calls 150 --spacing 20 --minutes 55
       - name: Export site data (also records today's passage-odds bands)
         run: python -m ingest export --out site
+      - name: Home-page AI summaries (Opus 5.5; reused when nothing changed, kept from yesterday if rejected)
+        # Hidden on the site until the SUMMARIES_LIVE repository variable is 1; ?preview=summaries shows them.
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DH_SUMMARIES_LIVE: ${{ vars.SUMMARIES_LIVE }}
+        run: python -m ingest summaries --site site
       - name: Pre-publish checks (stop here if the data shrank or went stale)
         run: python -m ingest health --compare before.json
       - name: Summary
