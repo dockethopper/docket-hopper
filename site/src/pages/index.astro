@@ -28,7 +28,7 @@ const sumBox = (k) => {
 };
 const chart = { same: site.congresses.map((c) => ({ k: c, v: SP[c] })), cur, day: site.day, stages };
 ---
-<Site title="Docket Hopper: every bill in Congress since 2013" section="home" page={1}
+<Site title="Docket Hopper: every bill in Congress since 2013" section="home" nav="home" page={1}
   note="Laws counted on the date they became public or private law. Simple and concurrent resolutions excluded.">
   <div class="cover">
     <div class="eyebrow">{ord(cur)} Congress · day {site.day} of 730</div>
