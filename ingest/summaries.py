@@ -70,7 +70,8 @@ Rules, all required:
 PROMPTS = {
     "floor": ("Write a summary of recent floor and chamber action in Congress, 3 to 5 paragraphs, about 250 to 400 words. "
               "Start with the overall picture for the period (how much moved and of what kind), then cover the most significant "
-              "bills, grouping related ones, then close with the context figures. Records:"),
+              "bills, grouping related ones, then close with the context figures. Each bill's status_now says where it stands today; "
+              "if a bill has since been signed into law, say so in a few words instead of describing it as pending. Records:"),
     "laws": ("Write a summary of the bills recently signed into law, 2 to 4 paragraphs, about 150 to 300 words. "
              "Start with the overall picture (how many and what areas), then describe the most significant laws, then close "
              "with the context figures. Records:"),
@@ -99,6 +100,12 @@ def _bill(conn, bid: str) -> dict:
     return out
 
 
+STATUS_NOW = {
+    "became_law": "has since been signed into law", "veto_overridden": "became law over a veto",
+    "vetoed": "vetoed", "to_president": "awaiting the President's decision", "failed": "failed",
+}
+
+
 def floor_input(conn, cur: int, data_date: str, ctx: dict) -> dict | None:
     """Bills with floor or chamber action in the 14 days to data_date (wider if that is too quiet)."""
     def rows(days):
@@ -122,6 +129,7 @@ def floor_input(conn, cur: int, data_date: str, ctx: dict) -> dict | None:
     for bid in list(by)[:40]:
         d = _bill(conn, bid)
         d.pop("public_law", None)
+        d["status_now"] = STATUS_NOW.get(conn.execute("SELECT status FROM bills WHERE bill_id = ?", (bid,)).fetchone()[0], "pending")
         d["actions_in_period"] = by[bid][:6]
         bills.append(d)
     start = (date.fromisoformat(data_date) - timedelta(days=days)).isoformat()
