@@ -74,3 +74,13 @@ site works at `dockethopper.github.io/docket-hopper/` now and at `dockethopper.c
 - `@astrojs/sitemap` writes `sitemap-index.xml` for every pre-rendered page; `robots.txt` points to it.
   Older bills render in the browser from the 404 fallback, so they are not in the sitemap.
 - `site/public/og.png` is the link-preview image (1200×630) for every page.
+
+### Home-page AI summaries
+
+`python -m ingest summaries --site site` writes two short summaries (latest floor action; recently signed
+laws) with Claude Opus 5.5, from the records in those lists only. A check rejects a summary that names a
+bill or law number, or uses a figure, not in its input; then yesterday's stays up (for up to 7 days) or the
+drop-down hides. Unchanged inputs reuse the last summary, so quiet nights make no API call. Every attempt is
+logged in the `ai_summary_log` table. Needs the `ANTHROPIC_API_KEY` Actions secret. The drop-downs stay
+hidden (visible with `?preview=summaries`) until the `SUMMARIES_LIVE` repository variable is `1`; the About
+page then says they are AI-written.

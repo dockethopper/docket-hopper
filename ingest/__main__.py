@@ -7,6 +7,7 @@
     python -m ingest stats                            # quick summary of what is in the DB
     python -m ingest gdelt --max-calls 150            # news coverage for active bills, spaced calls
     python -m ingest export --out site                # JSON for the static site (also records odds history)
+    python -m ingest summaries --site site            # the two home-page AI summaries (needs ANTHROPIC_API_KEY)
     python -m ingest health --save before.json        # record counts before the nightly sync
     python -m ingest health --compare before.json     # block publishing if data shrank or went stale
     python -m ingest snapshots --today 2026-11-04 NAME ...   # print backup names that can be deleted
@@ -67,6 +68,9 @@ def main(argv: list[str] | None = None) -> None:
     e.add_argument("--out", default=str(ROOT / "site"))
     e.add_argument("--workers", type=int)
 
+    sm = sub.add_parser("summaries")
+    sm.add_argument("--site", default=str(ROOT / "site"))
+
     h = sub.add_parser("health")
     h.add_argument("--save")
     h.add_argument("--compare")
@@ -102,6 +106,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "export":
         from . import export
         export.run(conn, Path(args.out), workers=args.workers)
+    elif args.cmd == "summaries":
+        from . import summaries
+        summaries.run(conn, Path(args.site))
     elif args.cmd == "health":
         from . import health
         if args.save:

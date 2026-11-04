@@ -2,6 +2,8 @@
 import Site from "../layouts/Site.astro";
 import site from "../data/site.json";
 import { fmt, pct, ord, word, billLabel, billPath, fdate, esc } from "../lib/ui.js";
+import { summaryHTML } from "../lib/summary.js";
+import { loadSummaries } from "../lib/summaries-data.js";
 const base = import.meta.env.BASE_URL;
 const cur = site.cur;
 const C = site.congress.find((c) => c.congress === cur);
@@ -16,6 +18,14 @@ const stages = [
   ["Vetoed", C.vetoed_standing],
   ["Became law", C.enacted],
 ];
+const SUM = loadSummaries();
+// Until the summaries go live they are built in hidden; ?preview=summaries shows them.
+const sumBox = (k) => {
+  const sec = SUM.sections?.[k];
+  if (!sec) return "";
+  const when = sec.current ? `Written ${fdate(sec.generated)} from records through ${fdate(sec.data_date)}.` : `From ${fdate(sec.generated)}; tonight's update did not pass its checks.`;
+  return `<details class="ai-sum"${SUM.live ? "" : " hidden data-preview"}><summary>Summary</summary><div class="ai-body">${summaryHTML(sec, base)}<p class="ai-note">Automated summary written by AI from the public record below. It can contain errors; the list and each bill's page are the source. ${when}</p></div></details>`;
+};
 const chart = { same: site.congresses.map((c) => ({ k: c, v: SP[c] })), cur, day: site.day, stages };
 ---
 <Site title="Docket Hopper: every bill in Congress since 2013" section="home" page={1}
@@ -39,13 +49,14 @@ const chart = { same: site.congresses.map((c) => ({ k: c, v: SP[c] })), cur, day
     </div></div>
   <div><div class="exh-h"><span class="n">Exhibit 2</span><b>Where the {fmt(C.introduced)} bills of the {ord(cur)} Congress stand,</b> <span class="u">furthest stage reached, count</span></div><div class="chart" id="c-stage"></div></div>
   <div class="grid2e">
-    <div><div class="label" style="margin-bottom:6px">Latest floor and chamber action</div><div class="list">
+    <div><div class="label" style="margin-bottom:6px">Latest floor and chamber action</div><Fragment set:html={sumBox("floor")} /><div class="list">
       {site.moving.slice(0, 5).map((b) => <div class="row"><span class="mono">{billLabel(b.bill_id)}</span><div><a class="t" href={`${base}${billPath(b.bill_id)}`}>{b.title}</a><div class="m">{b.latest_action_text}</div></div><span class="d">{fdate(b.latest_action_date)}</span></div>)}
     </div></div>
-    <div><div class="label" style="margin-bottom:6px">Recently signed into law</div><div class="list">
+    <div><div class="label" style="margin-bottom:6px">Recently signed into law</div><Fragment set:html={sumBox("laws")} /><div class="list">
       {site.recent_laws.slice(0, 5).map((b) => <div class="row"><span class="mono">{b.law_type === "Private Law" ? "Pvt. L." : "P.L."} {b.law_number}</span><div><a class="t" href={`${base}${billPath(b.bill_id)}`}>{b.title}</a><div class="m">{b.policy_area ? `${b.policy_area} · ` : ""}{billLabel(b.bill_id)}</div></div><span class="d">{fdate(b.latest_action_date)}</span></div>)}
     </div></div>
   </div>
+  {!SUM.live && <script is:inline>if (/[?&]preview=summaries\b/.test(location.search)) document.querySelectorAll("details[data-preview]").forEach((d) => { d.hidden = false; d.open = true; });</script>}
   <script type="application/json" id="land-data" set:html={JSON.stringify(chart)} />
   <script>
     import { scaleBand, scaleLinear } from "d3-scale";

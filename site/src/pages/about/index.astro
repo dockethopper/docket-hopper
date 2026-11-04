@@ -2,12 +2,14 @@
 import Site from "../../layouts/Site.astro";
 import site from "../../data/site.json";
 import { fmt, pct, ord, fdate } from "../../lib/ui.js";
+import { loadSummaries } from "../../lib/summaries-data.js";
+const AI = loadSummaries().live;
 const T = site.totals, Mo = site.model;
 const bands = Mo.bands;
 ---
 <Site title="About the data · Docket Hopper" section="about" nav="about" page={7}
   description="Where Docket Hopper's numbers come from, how they update, and what they cannot tell you.">
-  <div><h1 class="claim" style="max-width:40ch">Everything here comes from public records and simple statistics; nothing is written by AI</h1>
+  <div><h1 class="claim" style="max-width:40ch">{AI ? "Everything here comes from public records and simple statistics; only two home-page summaries are written by AI" : "Everything here comes from public records and simple statistics; nothing is written by AI"}</h1>
     <p class="sub">{fmt(T.bills)} bills and resolutions from the {ord(site.congresses[0])} Congress (2013) to now, {pct(T.with_summary / T.bills, 0)} with a CRS summary, {fmt(T.links)} recorded links between bills. Data through {fdate(site.data_date)}.</p></div>
   <div class="prose">
     <h2>Sources</h2>
@@ -17,6 +19,8 @@ const bands = Mo.bands;
       <li><b>News coverage</b> from the <a href="https://www.gdeltproject.org/">GDELT Project</a> DOC API. We store article counts and headline links, never article text.</li>
       <li><b>Passage odds</b> from Docket Hopper's own statistical model, described below.</li>
     </ol>
+    {AI && <><h2>The two AI summaries</h2>
+    <p>The "Summary" drop-downs above the home page's latest action and new laws are written each night by Claude Opus 5.5, an AI model from Anthropic. It sees only the records in those two lists (bill numbers, titles, sponsors, actions, CRS summaries) and this site's own counts, and is told not to add outside facts or characterize anyone. Before a summary appears, a check rejects it if it names a bill or law number, or uses a figure, that is not in its records. If it fails, the previous day's summary stays up with its date, or the drop-down is hidden. Nothing else on the site is written by AI.</p></>}
     <h2>How it updates</h2>
     <p>Every night a GitHub Action downloads the bills govinfo changed, collects news coverage for a few hundred active bills (GDELT allows only slow, spaced requests), counts words in newly published bill text, rates every active bill, and rebuilds this site. The full database is published as a SQLite file with each run.</p>
     <h2>What counts as a bill</h2>
